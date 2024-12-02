@@ -7,32 +7,38 @@ use std::{
     path::{Path, PathBuf},
 };
 
-fn get_data(path: &Path) -> Result<(Vec<usize>, Vec<usize>)> {
+fn get_data(path: &Path, cols: usize) -> Result<Vec<Vec<usize>>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
-    let result = reader.lines().map(|line| -> Result<(usize, usize)> {
+
+    let mut result = vec![Vec::new(); cols];
+    for line in reader.lines() {
         let parsed: Vec<Result<_>> = line?
             .split_whitespace()
             .map(|val| val.parse::<usize>().map_err(|e| e.into()))
             .collect();
         let parsed: Result<Vec<usize>> = parsed.into_iter().collect();
         let parsed = parsed?;
-        assert_eq!(parsed.len(), 2);
-        Ok((parsed[0], parsed[1]))
-    });
-
-    result.collect()
+        assert_eq!(parsed.len(), cols);
+        for index in 0..cols {
+            result[index].push(parsed[index]);
+        }
+    }
+    Ok(result)
 }
 
 fn day_01() -> Result<()> {
     println!("day 01");
-    let path = PathBuf::from("./resources/data.txt");
-    let (mut left, mut right) = get_data(&path)?;
+    let path = PathBuf::from("./resources/day01.txt");
+    let mut data = get_data(&path, 2)?;
+    let [ref mut left, ref mut right] = &mut data[..] else {
+        unreachable!()
+    };
 
     left.sort();
     right.sort();
 
-    let distance: usize = zip(&left, &right)
+    let distance: usize = zip(&mut *left, &mut *right)
         .into_iter()
         .map(|(a, b)| a.abs_diff(*b))
         .sum();
