@@ -3,11 +3,19 @@ use std::{
     cmp::{max, min},
     collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read},
     iter::zip,
     ops::BitAnd,
     path::{Path, PathBuf},
 };
+
+fn get_data_string(path: &Path) -> Result<String> {
+    let file = File::open(path)?;
+    let mut reader = BufReader::new(file);
+    let mut result = String::new();
+    reader.read_to_string(&mut result)?;
+    Ok(result)
+}
 
 fn get_data_fixed_columns<const C: usize>(path: &Path) -> Result<[Vec<usize>; C]> {
     let file = File::open(path)?;
@@ -153,14 +161,141 @@ fn day_02() -> Result<()> {
     Ok(())
 }
 
+struct Mul(usize, usize);
+
+fn parse_mul(input: &str) -> Vec<Mul> {
+    let mut result = Vec::new();
+    let mut remaining = &input[..];
+    const MAX_PATTERN: usize = 12;
+
+    fn parse_val(s: &str) -> Option<usize> {
+        if s.len() > 3 {
+            None
+        } else {
+            s.parse().ok()
+        }
+    }
+
+    while remaining.len() > 0 {
+        let index = match remaining.find("mul(") {
+            Some(index) => index,
+            None => break,
+        };
+        remaining = &remaining[index..];
+        let slice_end = min(MAX_PATTERN, remaining.len());
+        let check = &remaining[..slice_end];
+        let comma = match check.find(",") {
+            Some(index) => index,
+            None => {
+                remaining = &remaining[4..];
+                continue;
+            }
+        };
+        let first_val = match parse_val(&check[4..comma]) {
+            Some(val) => val,
+            None => {
+                remaining = &remaining[4..];
+                continue;
+            }
+        };
+        let closing = match check.find(")") {
+            Some(index) => index,
+            None => {
+                remaining = &remaining[4..];
+                continue;
+            }
+        };
+        let second_val = match parse_val(&check[comma + 1..closing]) {
+            Some(val) => val,
+            None => {
+                remaining = &remaining[4..];
+                continue;
+            }
+        };
+        result.push(Mul(first_val, second_val));
+        remaining = &remaining[4..];
+    }
+
+    result
+}
+
+fn parse_mul_conditional(input: &str) -> Vec<Mul> {
+    let mut result = Vec::new();
+    let mut remaining = &input[..];
+
+    while remaining.len() > 0 {
+        // we are always enabled at the beginning of a loop
+        let Some(dont_index) = remaining.find("don't()") else {
+            result.extend(parse_mul(remaining));
+            break;
+        };
+        let mul_slice = &remaining[..dont_index];
+        result.extend(parse_mul(mul_slice));
+
+        // skip forward until we are enabled again
+        let searching_do = &remaining[dont_index + 7..];
+        let Some(do_index) = searching_do.find("do()") else {
+            break;
+        };
+        remaining = &remaining[dont_index + 7 + do_index + 4..];
+    }
+
+    result
+}
+
+fn day_03() -> Result<()> {
+    println!("day 03");
+    let path = PathBuf::from("./resources/day03.txt");
+    let data = get_data_string(&path)?;
+    let muls = parse_mul(&data);
+
+    let result = muls
+        .iter()
+        .map(|&Mul(a, b)| a * b)
+        .reduce(|a, b| a + b)
+        .unwrap_or(0);
+    println!("result={result}");
+
+    let cond_muls = parse_mul_conditional(&data);
+
+    let cond_result = cond_muls
+        .iter()
+        .map(|&Mul(a, b)| a * b)
+        .reduce(|a, b| a + b)
+        .unwrap_or(0);
+    println!("cond_result={cond_result}");
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     day_01()?;
     day_02()?;
+    day_03()?;
     Ok(())
 }
 
 #[cfg(test)]
-mod tests {
+mod test_day_03 {
+    use super::*;
+
+    #[test]
+    fn test_parse() {
+        let s = "a mul(1,2) to mul(43,654)";
+        let muls = parse_mul(s);
+        assert_eq!(muls.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_cond() {
+        let s = "a don't() mul(1,2) to do() mul(43,654)";
+        let muls = parse_mul_conditional(s);
+        assert_eq!(muls.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod test_day_02 {
     use super::*;
 
     #[test]
