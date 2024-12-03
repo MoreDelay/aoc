@@ -177,43 +177,32 @@ fn parse_mul(input: &str) -> Vec<Mul> {
     }
 
     while remaining.len() > 0 {
-        let index = match remaining.find("mul(") {
-            Some(index) => index,
-            None => break,
+        let Some(start_index) = remaining.find("mul(") else {
+            break;
         };
-        remaining = &remaining[index..];
-        let slice_end = min(MAX_PATTERN, remaining.len());
-        let check = &remaining[..slice_end];
-        let comma = match check.find(",") {
-            Some(index) => index,
-            None => {
-                remaining = &remaining[4..];
-                continue;
-            }
+        // skip forward for next iteration, but still check current mul
+        let check_slice = &remaining[start_index..];
+        remaining = &remaining[start_index + 4..];
+
+        let slice_end = min(MAX_PATTERN, check_slice.len());
+        let check_slice = &check_slice[..slice_end];
+
+        let Some(comma) = check_slice.find(",") else {
+            continue;
         };
-        let first_val = match parse_val(&check[4..comma]) {
-            Some(val) => val,
-            None => {
-                remaining = &remaining[4..];
-                continue;
-            }
+        let Some(first_val) = parse_val(&check_slice[4..comma]) else {
+            continue;
         };
-        let closing = match check.find(")") {
-            Some(index) => index,
-            None => {
-                remaining = &remaining[4..];
-                continue;
-            }
+
+        let check_slice = &check_slice[comma + 1..];
+
+        let Some(closing) = check_slice.find(")") else {
+            continue;
         };
-        let second_val = match parse_val(&check[comma + 1..closing]) {
-            Some(val) => val,
-            None => {
-                remaining = &remaining[4..];
-                continue;
-            }
+        let Some(second_val) = parse_val(&check_slice[..closing]) else {
+            continue;
         };
         result.push(Mul(first_val, second_val));
-        remaining = &remaining[4..];
     }
 
     result
