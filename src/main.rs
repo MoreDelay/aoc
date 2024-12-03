@@ -72,6 +72,54 @@ fn day_01() -> Result<()> {
     Ok(())
 }
 
+fn brute_force(row: &[usize]) -> bool {
+    let gradual = |a, b| (max(a, b) - min(a, b)) <= 3;
+    let increasing = |a, b| (a < b) && gradual(a, b);
+    let decreasing = |a, b| (a > b) && gradual(a, b);
+
+    let incr = row
+        .windows(2)
+        .flat_map(<&[usize; 2]>::try_from)
+        .filter(|&&[a, b]| !increasing(a, b))
+        .count()
+        == 0;
+    let decr = row
+        .windows(2)
+        .flat_map(<&[usize; 2]>::try_from)
+        .filter(|&&[a, b]| !decreasing(a, b))
+        .count()
+        == 0;
+    if incr || decr {
+        return true;
+    }
+
+    for i in 0..row.len() {
+        let mut temp = Vec::with_capacity(row.len() - 1);
+        for left in 0..i {
+            temp.push(row[left]);
+        }
+        for right in i + 1..row.len() {
+            temp.push(row[right]);
+        }
+        let incr = temp
+            .windows(2)
+            .flat_map(<&[usize; 2]>::try_from)
+            .filter(|&&[a, b]| !increasing(a, b))
+            .count()
+            == 0;
+        let decr = temp
+            .windows(2)
+            .flat_map(<&[usize; 2]>::try_from)
+            .filter(|&&[a, b]| !decreasing(a, b))
+            .count()
+            == 0;
+        if incr || decr {
+            return true;
+        }
+    }
+    return false;
+}
+
 fn validate_record_dampened(row: &[usize], skips: usize) -> bool {
     let skips = min(row.len() - 1, skips);
 
@@ -151,10 +199,7 @@ fn day_02() -> Result<()> {
         .count();
     println!("valid={valid_records}");
 
-    let dampened_records: Vec<_> = data
-        .iter()
-        .filter(|&row| validate_record_dampened(row, 1))
-        .collect();
+    let dampened_records: Vec<_> = data.iter().filter(|&row| brute_force(row)).collect();
     let dampened_valid = dampened_records.len();
 
     println!("dampened={dampened_valid}");
