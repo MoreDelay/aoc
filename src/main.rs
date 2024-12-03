@@ -72,6 +72,62 @@ fn day_01() -> Result<()> {
     Ok(())
 }
 
+fn validate_record_dampened(row: &[usize], skips: usize) -> bool {
+    let skips = min(row.len() - 1, skips);
+
+    // dynamic program:
+    // mark if record valid using 0, 1, ... skips
+    // value indicates the index of last value to compare to
+    let mut increasing_table = vec![vec![None; row.len()]; skips + 1];
+    let mut decreasing_table = vec![vec![None; row.len()]; skips + 1];
+
+    let gradual = |a, b| (max(a, b) - min(a, b)) <= 3;
+    let increasing = |a, b| (a < b) && gradual(a, b);
+    let decreasing = |a, b| (a > b) && gradual(a, b);
+
+    // initialize: skipping all values until no longer able to is valid
+    for index in 0..=skips {
+        increasing_table[index][index] = Some(index);
+        decreasing_table[index][index] = Some(index);
+    }
+
+    for index in 1..row.len() {
+        let cur = row[index];
+
+        let no_skip_incr = increasing_table[0][index - 1]
+            .is_some_and(|last_index| increasing(row[last_index], cur))
+            .then_some(index);
+        let no_skip_decr = decreasing_table[0][index - 1]
+            .is_some_and(|last_index| decreasing(row[last_index], cur))
+            .then_some(index);
+
+        increasing_table[0][index] = no_skip_incr;
+        decreasing_table[0][index] = no_skip_decr;
+    }
+
+    for skip in 1..=skips {
+        for index in (skip + 1)..row.len() {
+            let cur = row[index];
+
+            let no_skip_incr = increasing_table[skip][index - 1]
+                .is_some_and(|last_index| increasing(row[last_index], cur))
+                .then_some(index);
+            let no_skip_decr = decreasing_table[skip][index - 1]
+                .is_some_and(|last_index| decreasing(row[last_index], cur))
+                .then_some(index);
+
+            let skip_here_incr = increasing_table[skip - 1][index - 1];
+            let skip_here_decr = decreasing_table[skip - 1][index - 1];
+
+            increasing_table[skip][index] = skip_here_incr.or(no_skip_incr);
+            decreasing_table[skip][index] = skip_here_decr.or(no_skip_decr);
+        }
+    }
+
+    increasing_table[skips][row.len() - 1].is_some()
+        || decreasing_table[skips][row.len() - 1].is_some()
+}
+
 fn day_02() -> Result<()> {
     println!("day 02");
     let path = PathBuf::from("./resources/day02.txt");
@@ -93,8 +149,15 @@ fn day_02() -> Result<()> {
                     .all(|&[a, b]| decreasing(a, b) && gradual(a, b))
         })
         .count();
-
     println!("valid={valid_records}");
+
+    let dampened_records: Vec<_> = data
+        .iter()
+        .filter(|&row| validate_record_dampened(row, 1))
+        .collect();
+    let dampened_valid = dampened_records.len();
+
+    println!("dampened={dampened_valid}");
     Ok(())
 }
 
@@ -102,4 +165,100 @@ fn main() -> Result<()> {
     day_01()?;
     day_02()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_one() {
+        let row = vec![1; 1];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_small() {
+        let row = vec![50, 51];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_incr() {
+        let row = vec![50, 51, 52, 53, 54];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_incr_skip_first() {
+        let row = vec![52, 51, 52, 53, 54];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_incr_skip_last() {
+        let row = vec![50, 51, 52, 53, 52];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_incr_skip_middle() {
+        let row = vec![50, 51, 46, 53, 54];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_incr_skip_twice() {
+        let row = vec![50, 51, 51, 53, 53];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(!valid);
+    }
+
+    #[test]
+    fn test_decr() {
+        let row = vec![66, 63, 59, 58, 56];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(!valid);
+    }
+
+    #[test]
+    fn test_decr_skip_first() {
+        let row = vec![68, 61, 60, 59, 56];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_decr_skip_last() {
+        let row = vec![62, 61, 60, 59, 52];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_decr_skip_middle() {
+        let row = vec![62, 61, 60, 61, 59];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(valid);
+    }
+
+    #[test]
+    fn test_decr_skip_twice() {
+        let row = vec![62, 62, 60, 60, 59];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(!valid);
+    }
+
+    #[test]
+    fn test_example_1() {
+        let row = vec![7, 6, 4, 2, 1];
+        let valid = validate_record_dampened(&row, 1);
+        assert!(valid);
+    }
 }
