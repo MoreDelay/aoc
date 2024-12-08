@@ -103,21 +103,14 @@ fn find_pattern_2d(x: usize, y: usize, data: &Vec<Vec<u8>>, pattern: &[u8]) -> u
     total
 }
 
-fn find_patterns_1d(data: &Vec<Vec<u8>>, pattern: &[u8]) -> usize {
+fn find_patterns<'a, F>(data: &'a Vec<Vec<u8>>, find_pattern: F) -> usize
+where
+    F: Fn(usize, usize, &'a Vec<Vec<u8>>) -> usize,
+{
     let mut total = 0;
     for y in 0..data.len() {
         for x in 0..data[0].len() {
-            total += find_pattern_1d(x, y, data, pattern);
-        }
-    }
-    total
-}
-
-fn find_patterns_2d(data: &Vec<Vec<u8>>, pattern: &[u8]) -> usize {
-    let mut total = 0;
-    for y in 0..data.len() {
-        for x in 0..data[0].len() {
-            total += find_pattern_2d(x, y, data, pattern);
+            total += find_pattern(x, y, data);
         }
     }
     total
@@ -133,10 +126,12 @@ pub fn run() -> Result<()> {
         .chars()
         .map(|c| mapping_fn(c, pattern))
         .collect::<Vec<_>>();
-    let count = find_patterns_1d(&data, &pattern);
+    let find_pattern = |x, y, v| find_pattern_1d(x, y, v, &pattern);
+    let count = find_patterns(&data, find_pattern);
     println!("pattern count 1d: {count}");
     let pattern = &pattern[1..];
-    let count = find_patterns_2d(&data, &pattern);
+    let find_pattern = |x, y, v| find_pattern_2d(x, y, v, pattern);
+    let count = find_patterns(&data, find_pattern);
     println!("pattern count 2d: {count}");
     Ok(())
 }
@@ -149,7 +144,8 @@ mod tests {
     fn test_find_patterns_horizontal() {
         let pattern: Vec<u8> = vec![0, 1, 2, 3];
         let data: Vec<Vec<u8>> = vec![vec![4, 4, 0, 1, 2, 3, 4]];
-        let total = find_patterns_1d(&data, &pattern);
+        let find_pattern = |x, y, v| find_pattern_1d(x, y, v, &pattern);
+        let total = find_patterns(&data, find_pattern);
         assert_eq!(total, 1);
     }
 
@@ -165,7 +161,8 @@ mod tests {
             vec![3],
             vec![4],
         ];
-        let total = find_patterns_1d(&data, &pattern);
+        let find_pattern = |x, y, v| find_pattern_1d(x, y, v, &pattern);
+        let total = find_patterns(&data, find_pattern);
         assert_eq!(total, 1);
     }
 
@@ -180,7 +177,8 @@ mod tests {
             vec![4, 4, 4, 4, 4, 4],
             vec![4, 4, 4, 4, 4, 4],
         ];
-        let total = find_patterns_1d(&data, &pattern);
+        let find_pattern = |x, y, v| find_pattern_1d(x, y, v, &pattern);
+        let total = find_patterns(&data, find_pattern);
         assert_eq!(total, 1);
     }
 
@@ -195,7 +193,8 @@ mod tests {
             vec![4, 0, 0, 4, 4, 4],
             vec![4, 4, 4, 4, 4, 4],
         ];
-        let total = find_patterns_1d(&data, &pattern);
+        let find_pattern = |x, y, v| find_pattern_1d(x, y, v, &pattern);
+        let total = find_patterns(&data, find_pattern);
         assert_eq!(total, 2);
     }
 
@@ -210,7 +209,8 @@ mod tests {
             vec![4, 0, 4, 0, 4, 4],
             vec![4, 4, 3, 2, 1, 0],
         ];
-        let total = find_patterns_1d(&data, &pattern);
+        let find_pattern = |x, y, v| find_pattern_1d(x, y, v, &pattern);
+        let total = find_patterns(&data, find_pattern);
         assert_eq!(total, 6);
     }
 }
