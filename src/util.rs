@@ -5,6 +5,14 @@ use std::{
     path::Path,
 };
 
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum AocError {
+    #[error("Parse Error")]
+    ParseError,
+}
+
 pub fn get_data_string(path: &Path) -> Result<String> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
