@@ -56,7 +56,11 @@ fn update_upholds_rules(update: &[usize], rules: &Vec<Rule>) -> bool {
         .all(|b| b)
 }
 
-fn quick_sort_update(update: &mut [usize], rules: &Vec<Rule>) {
+fn quick_sort<T, F>(update: &mut [T], sort_criterion: &F)
+where
+    T: Copy,
+    F: Fn(T, T) -> bool,
+{
     if update.len() < 2 {
         return;
     }
@@ -64,7 +68,7 @@ fn quick_sort_update(update: &mut [usize], rules: &Vec<Rule>) {
     let mut first_after_divide = 1;
     let length = update.len();
     for index in 1..length {
-        if !all_rules_upheld(update[0], update[index], rules) {
+        if !sort_criterion(update[0], update[index]) {
             if first_after_divide < index {
                 let (left, right) = update.split_at_mut(index);
                 let left = &mut left[first_after_divide];
@@ -84,10 +88,10 @@ fn quick_sort_update(update: &mut [usize], rules: &Vec<Rule>) {
     // skip the correctly placed checked value
     let checked_pos = first_after_divide - 1;
     if checked_pos > 0 {
-        quick_sort_update(&mut update[..checked_pos], rules);
+        quick_sort(&mut update[..checked_pos], sort_criterion);
     }
     if checked_pos < update.len() - 1 {
-        quick_sort_update(&mut update[checked_pos + 1..], rules);
+        quick_sort(&mut update[checked_pos + 1..], sort_criterion);
     }
 }
 
@@ -104,11 +108,12 @@ pub fn run() -> Result<()> {
         .sum::<usize>();
     println!("mid sum of correct updates: {mid_sum_correct}");
 
+    let sort_criterion = |a, b| all_rules_upheld(a, b, &rules);
     let mid_sum_incorrect = updates
         .iter_mut()
         .filter(|u| !update_upholds_rules(u, &rules))
         .map(|u| {
-            quick_sort_update(u, &rules);
+            quick_sort(u, &sort_criterion);
             u
         })
         .map(|u| u[u.len() / 2])
