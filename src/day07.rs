@@ -70,36 +70,32 @@ fn can_construct_equation(equation: &Equation) -> bool {
             }
         }
         let next_value = values[next_index];
-        match next_op {
+        let next_result = match next_op {
             NextOperators::Mul => {
-                let next_result = result * next_value;
                 stack.push(State {
                     index,
                     result,
                     next_op: NextOperators::Add,
                 });
-                stack.push(State {
-                    index: next_index,
-                    result: next_result,
-                    next_op: NextOperators::Mul,
-                });
+                result * next_value
             }
             NextOperators::Add => {
-                let next_result = result + next_value;
                 stack.push(State {
                     index,
                     result,
                     next_op: NextOperators::Done,
                 });
-                stack.push(State {
-                    index: next_index,
-                    result: next_result,
-                    next_op: NextOperators::Mul,
-                });
+                result + next_value
             }
-            NextOperators::Done => (),
+            NextOperators::Done => continue,
             NextOperators::Concat => unreachable!(),
         };
+
+        stack.push(State {
+            index: next_index,
+            result: next_result,
+            next_op: NextOperators::Mul,
+        });
     }
     false
 }
@@ -128,50 +124,40 @@ fn can_construct_equation_with_concat(equation: &Equation) -> bool {
             }
         }
         let next_value = values[next_index];
-        match next_op {
+        let next_result = match next_op {
             NextOperators::Mul => {
-                let next_result = result * next_value;
                 stack.push(State {
                     index,
                     result,
                     next_op: NextOperators::Add,
                 });
-                stack.push(State {
-                    index: next_index,
-                    result: next_result,
-                    next_op: NextOperators::Mul,
-                });
+                result * next_value
             }
             NextOperators::Add => {
-                let next_result = result + next_value;
                 stack.push(State {
                     index,
                     result,
                     next_op: NextOperators::Concat,
                 });
-                stack.push(State {
-                    index: next_index,
-                    result: next_result,
-                    next_op: NextOperators::Mul,
-                });
+                result + next_value
             }
             NextOperators::Concat => {
-                let mut concatted = result.to_string();
-                concatted.extend(next_value.to_string().chars());
-                let next_result: usize = concatted.parse().unwrap();
                 stack.push(State {
                     index,
                     result,
                     next_op: NextOperators::Done,
                 });
-                stack.push(State {
-                    index: next_index,
-                    result: next_result,
-                    next_op: NextOperators::Mul,
-                });
+                let mut concatted = result.to_string();
+                concatted.extend(next_value.to_string().chars());
+                concatted.parse().unwrap()
             }
-            NextOperators::Done => (),
+            NextOperators::Done => continue,
         };
+        stack.push(State {
+            index: next_index,
+            result: next_result,
+            next_op: NextOperators::Mul,
+        });
     }
     false
 }
