@@ -69,6 +69,9 @@ fn can_construct_equation(equation: &Equation) -> bool {
                 continue;
             }
         }
+        if result > *target {
+            continue;
+        }
         let next_value = values[next_index];
         let next_result = match next_op {
             NextOperators::Mul => {
@@ -122,6 +125,9 @@ fn can_construct_equation_with_concat(equation: &Equation) -> bool {
             } else {
                 continue;
             }
+        }
+        if result > *target {
+            continue;
         }
         let next_value = values[next_index];
         let next_result = match next_op {
