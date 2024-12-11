@@ -9,7 +9,7 @@ struct Equation {
 }
 
 fn generate_equations(input: &str) -> Result<Vec<Equation>> {
-    let res = input
+    input
         .split("\n")
         .filter(|s| s.len() != 0)
         .map(|s| {
@@ -27,8 +27,7 @@ fn generate_equations(input: &str) -> Result<Vec<Equation>> {
                 values: operands,
             })
         })
-        .collect::<Result<_>>()?;
-    Ok(res)
+        .collect::<Result<_>>()
 }
 
 enum NextOperators {
