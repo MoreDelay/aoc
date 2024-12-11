@@ -21,7 +21,9 @@ fn generate_equations(input: &str) -> Result<Vec<Equation>> {
                 .split_whitespace()
                 .map(|o| Ok(o.parse()?))
                 .collect::<Result<Vec<_>>>()?;
-            assert_ne!(operands.len(), 0);
+            if operands.len() == 0 {
+                return Err(AocError::ParseError.into());
+            }
             Ok(Equation {
                 target: value,
                 values: operands,
