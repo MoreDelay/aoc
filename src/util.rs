@@ -58,3 +58,27 @@ pub fn get_data_rows(path: &Path) -> Result<Vec<Vec<usize>>> {
     }
     Ok(result)
 }
+
+pub fn parse_tiles<T, F>(input: &str, parser: F) -> Result<Vec<Vec<T>>, AocError>
+where
+    F: Fn(usize, usize, char) -> Result<T, AocError>,
+{
+    let mut width = None;
+    input
+        .split("\n")
+        .filter(|s| s.len() != 0)
+        .enumerate()
+        .map(|(y, s)| {
+            let row = s
+                .chars()
+                .enumerate()
+                .map(|(x, c)| parser(x, y, c))
+                .collect::<Result<Vec<_>, AocError>>()?;
+            if *width.get_or_insert(row.len()) != row.len() {
+                Err(AocError::ParseError)
+            } else {
+                Ok(row)
+            }
+        })
+        .collect()
+}
