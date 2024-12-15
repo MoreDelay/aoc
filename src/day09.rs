@@ -4,112 +4,38 @@ use std::path::PathBuf;
 use crate::util::{self, AocError};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-struct Free {
-    start: usize,
-    count: usize,
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-struct File {
+struct FileBlock {
     id: usize,
     start: usize,
     count: usize,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
-enum Block {
-    Free(Free),
-    File(File),
-}
-
-impl std::fmt::Debug for Block {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Block::Free(free) => f.write_str(&".".repeat(free.count)),
-            Block::File(file) => f.write_str(&file.id.to_string().repeat(file.count)),
-        }
-    }
-}
-
 #[derive(Clone)]
 struct Layout {
-    blocks: Vec<Block>,
+    blocks: Vec<FileBlock>,
     size: usize,
 }
 
 impl std::fmt::Debug for Layout {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for b in self.blocks.iter() {
-            f.write_str(&format!("{b:?}"))?;
+        let mut last_end = 0;
+        for file in self.blocks.iter() {
+            let diff = file.start - last_end;
+            if diff > 0 {
+                let free = ".".to_string().repeat(diff);
+                f.write_str(&free)?;
+            }
+            let row = file.id.to_string().repeat(file.count);
+            f.write_str(&row)?;
+            last_end = file.start + file.count;
         }
+        let diff = self.size - last_end;
+        if diff > 0 {
+            let free = ".".to_string().repeat(diff);
+            f.write_str(&free)?;
+        }
+
         Ok(())
-    }
-}
-
-struct BlockIter<'a> {
-    layout: &'a Layout,
-    forward_block_index: usize,
-    forward_steps_within: usize,
-    backward_block_index: usize,
-    backward_steps_within: usize,
-}
-
-impl<'a> Layout {
-    fn iter(&'a self) -> BlockIter<'a> {
-        BlockIter {
-            layout: self,
-            forward_block_index: 0,
-            forward_steps_within: 0,
-            backward_block_index: self.blocks.len() - 1,
-            backward_steps_within: 0,
-        }
-    }
-}
-
-impl<'a> Iterator for BlockIter<'a> {
-    type Item = Block;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let n_blocks = self.layout.blocks.len();
-        for index in self.forward_block_index..n_blocks {
-            let steps = self.forward_steps_within;
-            let cur = self.layout.blocks[index];
-            let block = match cur {
-                b @ Block::Free(Free { count, .. }) if steps < count => Some(b),
-                b @ Block::File(File { count, .. }) if steps < count => Some(b),
-                _ => None,
-            };
-            if block.is_none() {
-                self.forward_steps_within = 0;
-                continue;
-            }
-            self.forward_block_index = index;
-            self.forward_steps_within += 1;
-            return block;
-        }
-        None
-    }
-}
-
-impl<'a> DoubleEndedIterator for BlockIter<'a> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        for index in (0..=self.backward_block_index).rev() {
-            let steps = self.backward_steps_within;
-            let cur = self.layout.blocks[index];
-            let block = match cur {
-                b @ Block::Free(Free { count, .. }) if steps < count => Some(b),
-                b @ Block::File(File { count, .. }) if steps < count => Some(b),
-                _ => None,
-            };
-            if block.is_none() {
-                self.backward_steps_within = 0;
-                continue;
-            }
-            self.backward_block_index = index;
-            self.backward_steps_within += 1;
-            return block;
-        }
-        None
     }
 }
 
@@ -119,148 +45,130 @@ fn is_even(val: usize) -> bool {
 
 fn get_layout(input: &str) -> Result<Layout> {
     let mut blocks = Vec::new();
-    let mut start = 0;
-    for (i, d) in input
+    let mut last_end = 0;
+    let test = input
         .trim()
         .chars()
-        .map(|c| c.to_digit(10).ok_or_else(|| AocError::ParseError))
-        .enumerate()
-    {
-        let count = d? as usize;
-        if is_even(i) {
-            let id = i / 2;
-            blocks.push(Block::File(File { id, start, count }));
+        .map(|c| {
+            let d = c
+                .to_digit(10)
+                .map(|d| d as usize)
+                .ok_or_else(|| AocError::ParseError);
+            Ok(d?)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    for (index, &digit) in test.iter().enumerate() {
+        if is_even(index) {
+            let id = index / 2;
+            let new_block = FileBlock {
+                id,
+                start: last_end,
+                count: digit,
+            };
+            blocks.push(new_block);
         } else {
-            blocks.push(Block::Free(Free { start, count }));
         }
-        start += count;
+        last_end += digit;
     }
 
     Ok(Layout {
         blocks,
-        size: start,
+        size: last_end,
     })
 }
 
-fn compute_blockwise_checksum(layout: &Layout) -> usize {
-    let n_blocks = layout.size;
-    let mut backward_files_iter = layout
-        .iter()
-        .rev()
-        .enumerate()
-        .filter_map(|(i, b)| match b {
-            Block::Free(_) => None,
-            Block::File(b) => {
-                let rev_i = n_blocks - 1 - i;
-                Some((rev_i, b))
-            }
-        });
+fn defragment_blockwise(layout: &Layout) -> Layout {
+    let mut file_iter = layout.blocks.iter();
+    let mut run_file = match file_iter.next() {
+        Some(file) => file,
+        None => return layout.clone(),
+    };
+    let mut new_blocks = Vec::new();
 
-    let mut last_right_block = n_blocks;
-    let mut checksum = 0;
-    for (i, b) in layout.iter().enumerate() {
-        if i >= last_right_block {
+    let mut last_index = 0;
+    // iterate over all files in reverse order
+    for last_file in layout.blocks.iter().rev() {
+        let mut last_file = *last_file;
+        if last_file.id < run_file.id {
             break;
         }
-        match b {
-            Block::Free(_) => {
-                let (rev_i, File { id, .. }) = backward_files_iter.next().unwrap();
-                last_right_block = rev_i;
-                if i >= last_right_block {
-                    break;
-                }
-                checksum += i * id;
+        // distribute current file completely
+        'dist: while last_file.count > 0 && run_file.id < last_file.id {
+            // find next free slot
+            let mut space = run_file.start - last_index;
+            while space == 0 && run_file.id < last_file.id {
+                new_blocks.push(*run_file);
+                last_index = run_file.start + run_file.count;
+                run_file = match file_iter.next() {
+                    Some(file) => file,
+                    None => break 'dist,
+                };
+                space = run_file.start - last_index;
             }
-            Block::File(File { id, .. }) => checksum += i * id,
+
+            // insert new file
+            let slot = space.min(last_file.count);
+            let insert = FileBlock {
+                id: last_file.id,
+                start: last_index,
+                count: slot,
+            };
+            new_blocks.push(insert);
+            last_file.count -= slot;
+            last_index += slot;
+        }
+
+        if last_file.count > 0 {
+            new_blocks.push(last_file);
         }
     }
 
-    checksum
+    let new_layout = Layout {
+        blocks: new_blocks,
+        size: layout.size,
+    };
+    new_layout
 }
 
 fn compute_checksum(layout: &Layout) -> usize {
     let mut checksum = 0;
-    for (i, b) in layout.iter().enumerate() {
-        match b {
-            Block::File(File { id, .. }) => checksum += i * id,
-            _ => continue,
+    for file in layout.blocks.iter() {
+        for step in 0..file.count {
+            checksum += file.id * (file.start + step);
         }
     }
     checksum
 }
 
-fn compute_filewise_checksum(layout: &Layout) -> usize {
-    let mut all_files: Vec<_> = layout
-        .blocks
-        .iter()
-        .filter_map(|b| match *b {
-            Block::File(file) => Some(file),
-            _ => None,
-        })
-        .collect();
+fn defrag_filewise(layout: &Layout) -> Layout {
+    let mut new_blocks = layout.blocks.clone();
 
-    let mut all_frees: Vec<_> = layout
-        .blocks
-        .iter()
-        .filter_map(|b| match *b {
-            Block::Free(free) => Some(free),
-            _ => None,
-        })
-        .collect();
-
-    for file in all_files.iter_mut().rev() {
-        let File {
-            id: _,
-            start,
-            count: file_size,
-        } = file;
-
-        let free_index = all_frees.iter().position(
-            |Free {
-                 start: free_start,
-                 count: free_space,
-             }| free_start < start && free_space >= file_size,
-        );
-        let Some(free_index) = free_index else {
-            continue;
-        };
-
-        let Free {
-            start: free_start,
-            count: free_space,
-        } = &mut all_frees[free_index];
-
-        file.start = *free_start;
-        *free_start += *file_size;
-        *free_space -= *file_size;
+    for file in layout.blocks.iter().rev() {
+        let mut last_index = 0;
+        for (index, run_file) in new_blocks.iter().enumerate() {
+            let space = run_file.start - last_index;
+            if space >= file.count {
+                let new_file = FileBlock {
+                    id: file.id,
+                    start: last_index,
+                    count: file.count,
+                };
+                new_blocks.insert(index, new_file);
+                let remove_index = new_blocks.iter().rposition(|f| f.id == file.id).unwrap();
+                new_blocks.remove(remove_index);
+                break;
+            }
+            last_index = run_file.start + run_file.count;
+        }
     }
 
-    all_files.sort_by(|left, right| left.start.cmp(&right.start));
+    new_blocks.sort_by(|l, r| l.start.cmp(&r.start));
 
-    let mut new_blocks = Vec::with_capacity(all_files.len() + all_files.len() - 1);
-    let Some(&first) = all_files.get(0) else {
-        return 0;
-    };
-    new_blocks.push(Block::File(first));
-
-    let mut last = first;
-
-    for file in all_files.iter().skip(1) {
-        let last_end = last.start + last.count;
-        let diff = file.start - last_end;
-        let new_free = Block::Free(Free {
-            start: last_end,
-            count: diff,
-        });
-        new_blocks.push(new_free);
-        new_blocks.push(Block::File(*file));
-        last = *file;
-    }
     let new_layout = Layout {
         blocks: new_blocks,
-        size: last.start + last.count,
+        size: layout.size,
     };
-    compute_checksum(&new_layout)
+    new_layout
 }
 
 pub fn run() -> Result<()> {
@@ -268,10 +176,12 @@ pub fn run() -> Result<()> {
     let path = PathBuf::from("./resources/day09.txt");
     let data = util::get_data_string(&path)?;
     let layout = get_layout(&data)?;
-    let checksum = compute_blockwise_checksum(&layout);
-    println!("checksum blockwise: {checksum}");
-    let checksum = compute_filewise_checksum(&layout);
-    println!("checksum filewise: {checksum}");
+    let defrag_block = defragment_blockwise(&layout);
+    let checksum_block = compute_checksum(&defrag_block);
+    println!("checksum blockwise: {checksum_block}");
+    let defrag_file = defrag_filewise(&layout);
+    let checksum_file = compute_checksum(&defrag_file);
+    println!("checksum filewise: {checksum_file}");
     Ok(())
 }
 
@@ -280,102 +190,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_iterate_layout() {
-        let input = "1234";
-        let layout = get_layout(input).unwrap();
-        let mut iter = layout.iter();
-        assert_eq!(
-            iter.next(),
-            Some(Block::File(File {
-                id: 0,
-                start: 0,
-                count: 1
-            }))
-        );
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 1, count: 2 })));
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 1, count: 2 })));
-        assert_eq!(
-            iter.next(),
-            Some(Block::File(File {
-                id: 1,
-                start: 3,
-                count: 3
-            }))
-        );
-        assert_eq!(
-            iter.next(),
-            Some(Block::File(File {
-                id: 1,
-                start: 3,
-                count: 3
-            }))
-        );
-        assert_eq!(
-            iter.next(),
-            Some(Block::File(File {
-                id: 1,
-                start: 3,
-                count: 3
-            }))
-        );
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 6, count: 4 })));
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 6, count: 4 })));
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 6, count: 4 })));
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 6, count: 4 })));
-        assert_eq!(iter.next(), None);
-    }
-
-    #[test]
-    fn test_iterate_layout_rev() {
-        let input = "1234";
-        let layout = get_layout(input).unwrap();
-        let mut iter = layout.iter().rev();
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 6, count: 4 })));
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 6, count: 4 })));
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 6, count: 4 })));
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 6, count: 4 })));
-        assert_eq!(
-            iter.next(),
-            Some(Block::File(File {
-                id: 1,
-                start: 3,
-                count: 3
-            }))
-        );
-        assert_eq!(
-            iter.next(),
-            Some(Block::File(File {
-                id: 1,
-                start: 3,
-                count: 3
-            }))
-        );
-        assert_eq!(
-            iter.next(),
-            Some(Block::File(File {
-                id: 1,
-                start: 3,
-                count: 3
-            }))
-        );
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 1, count: 2 })));
-        assert_eq!(iter.next(), Some(Block::Free(Free { start: 1, count: 2 })));
-        assert_eq!(
-            iter.next(),
-            Some(Block::File(File {
-                id: 0,
-                start: 0,
-                count: 1
-            }))
-        );
-        assert_eq!(iter.next(), None);
-    }
-
-    #[test]
     fn test_blockwise() {
         let input = "2333133121414131402";
         let layout = get_layout(input).unwrap();
-        let checksum = compute_blockwise_checksum(&layout);
+        let defrag = defragment_blockwise(&layout);
+        let checksum = compute_checksum(&defrag);
         assert_eq!(checksum, 1928);
     }
 
@@ -383,7 +202,8 @@ mod tests {
     fn test_filewise() {
         let input = "2333133121414131402";
         let layout = get_layout(input).unwrap();
-        let checksum = compute_filewise_checksum(&layout);
+        let defrag = defrag_filewise(&layout);
+        let checksum = compute_checksum(&defrag);
         assert_eq!(checksum, 2858);
     }
 }
