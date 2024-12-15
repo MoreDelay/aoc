@@ -11,6 +11,8 @@ use thiserror::Error;
 pub enum AocError {
     #[error("Parse Error")]
     ParseError,
+    #[error("Value Error")]
+    ValueError,
 }
 
 pub fn get_data_string(path: &Path) -> Result<String> {
