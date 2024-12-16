@@ -12,6 +12,7 @@ mod day07;
 mod day08;
 mod day09;
 mod day10;
+mod day11;
 
 fn main() -> Result<()> {
     #[allow(dead_code)]
@@ -25,7 +26,8 @@ fn main() -> Result<()> {
         day07::run()?;
         day08::run()?;
         day09::run()?;
+        day10::run()?;
     }
-    day10::run()?;
+    day11::run()?;
     Ok(())
 }

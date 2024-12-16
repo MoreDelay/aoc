@@ -39,10 +39,6 @@ impl std::fmt::Debug for Layout {
     }
 }
 
-fn is_even(val: usize) -> bool {
-    (val & 1) == 0
-}
-
 fn get_layout(input: &str) -> Result<Layout> {
     let mut blocks = Vec::new();
     let mut last_end = 0;
@@ -58,7 +54,7 @@ fn get_layout(input: &str) -> Result<Layout> {
         })
         .collect::<Result<Vec<_>>>()?;
     for (index, &digit) in test.iter().enumerate() {
-        if is_even(index) {
+        if util::is_even(index) {
             let id = index / 2;
             let new_block = FileBlock {
                 id,

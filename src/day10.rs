@@ -49,7 +49,7 @@ impl Tile {
             Tile::H6 => Ok(Tile::H7),
             Tile::H7 => Ok(Tile::H8),
             Tile::H8 => Ok(Tile::H9),
-            Tile::H9 => Err(AocError::ValueError),
+            Tile::H9 => Err(AocError::ValueError("H9 is already highest".to_string())),
         }
     }
 }

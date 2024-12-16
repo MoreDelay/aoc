@@ -11,8 +11,8 @@ use thiserror::Error;
 pub enum AocError {
     #[error("Parse Error")]
     ParseError,
-    #[error("Value Error")]
-    ValueError,
+    #[error("Value Error: {0}")]
+    ValueError(String),
 }
 
 pub fn get_data_string(path: &Path) -> Result<String> {
@@ -83,4 +83,8 @@ where
             }
         })
         .collect()
+}
+
+pub fn is_even(val: usize) -> bool {
+    (val & 1) == 0
 }
