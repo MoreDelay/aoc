@@ -102,6 +102,7 @@ fn can_construct_equation(equation: &Equation) -> bool {
     }
     false
 }
+
 // Depth First Search with backtracking when result gets too large
 fn can_construct_equation_with_concat(equation: &Equation) -> bool {
     let Equation { target, values } = equation;
