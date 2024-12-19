@@ -187,17 +187,16 @@ fn check_steps_close_to(
     let Movement(expensive_x, expensive_y) = button_a;
     let Movement(cheap_x, cheap_y) = button_b;
 
-    for i in 0..3 {
-        if i == 0 && cheap_steps == 0 {
+    for j in 0..3 {
+        if j == 0 && expensive_steps == 0 {
             continue;
         };
-        let test_cheap = cheap_steps + i - 1;
-
-        for j in 0..3 {
-            if j == 0 && expensive_steps == 0 {
+        let test_expensive = expensive_steps + j - 1;
+        for i in 0..3 {
+            if i == 0 && cheap_steps == 0 {
                 continue;
             };
-            let test_expensive = expensive_steps + j - 1;
+            let test_cheap = cheap_steps + i - 1;
 
             let got_x = test_cheap * cheap_x + test_expensive * expensive_x;
             let got_y = test_cheap * cheap_y + test_expensive * expensive_y;
@@ -221,8 +220,10 @@ fn check_machine(machine: Machine) -> Option<usize> {
     let Movement(cheap_x, cheap_y) = button_b;
     let Pos(target_x, target_y) = prize;
 
-    // edge case: both buttons move the same
-    if button_a == button_b {
+    let (expensive_steps, cheap_steps) = if button_a == button_b {
+        // edge case: both buttons move the same
+        // columns are linearly depentent, choose to only move with cheap steps
+
         // solve i * ax = tx
         // solve i * ay = ty
         let ax = cheap_x as f64;
@@ -237,42 +238,37 @@ fn check_machine(machine: Machine) -> Option<usize> {
         if i.abs_diff(j) > 1 {
             return None;
         }
-        let Some((j, i)) = check_steps_close_to(machine, 0, i) else {
-            return None;
-        };
-        return Some(j * 3 + i);
-    }
+        (0, i)
+    } else {
+        // at least one button does not move diagonal
+        // two equations with two variables -> unique solution
+        let ax = cheap_x as f64;
+        let ay = cheap_y as f64;
+        let bx = expensive_x as f64;
+        let by = expensive_y as f64;
+        let tx = target_x as f64;
+        let ty = target_y as f64;
+        // i * ax + j * bx = tx
+        // i * ay + j * by = ty
+        let by = by - (ay / ax) * bx;
+        let ty = ty - (ay / ax) * tx;
+        // i * ax + j * bx = tx
+        //          j * by = ty
+        let ty = ty / by;
+        // i * ax + j * bx = tx
+        //          j      = ty
+        let tx = tx - bx * ty;
+        // i * ax          = tx
+        //          j      = ty
+        let tx = tx / ax;
+        // i               = tx
+        //          j      = ty
 
-    // at least one button does not move diagonal
-    // solve i * ax + j * bx = tx
-    // solve i * ay + j * by = ty
-    let ax = cheap_x as f64;
-    let ay = cheap_y as f64;
-    let bx = expensive_x as f64;
-    let by = expensive_y as f64;
-    let tx = target_x as f64;
-    let ty = target_y as f64;
-
-    // 0      + j * by = ty
-    let by = by - (ay / ax) * bx;
-    let ty = ty - (ay / ax) * tx;
-
-    // 0      + j      = ty
-    let ty = ty / by;
-
-    // i * ax + 0      = tx
-    let tx = tx - bx * ty;
-
-    // i               = tx
-    let tx = tx / ax;
-
-    let cheap_steps = tx.round() as usize;
-    let expensive_steps = ty.round() as usize;
-
-    let Some((j, i)) = check_steps_close_to(machine, expensive_steps, cheap_steps) else {
-        return None;
+        (ty.round() as usize, tx.round() as usize)
     };
-    Some(j * 3 + i)
+
+    check_steps_close_to(machine, expensive_steps, cheap_steps)
+        .map_or(None, |(a, b)| Some(a * 3 + b))
 }
 
 fn find_optimal_cost_equation(machines: &Vec<Machine>) -> (usize, usize) {
@@ -387,13 +383,13 @@ Prize: X=18641, Y=10279";
     }
 
     #[test]
-    fn test_far_prize_same_as_old_solution() {
+    fn test_equation_solution_same_as_dijkstra_solution() {
         let path = PathBuf::from("./resources/day13.txt");
         let data = util::get_data_string(&path).unwrap();
         let machines = parse_machines(&data).unwrap();
-        let (tokens, prizes) = find_optimal_cost_dijkstra(&machines);
-        let (tokens_q, prizes_q) = find_optimal_cost_equation(&machines);
-        assert_eq!(prizes, prizes_q);
-        assert_eq!(tokens, tokens_q);
+        let (tokens_d, prizes_d) = find_optimal_cost_dijkstra(&machines);
+        let (tokens_e, prizes_e) = find_optimal_cost_equation(&machines);
+        assert_eq!(prizes_d, prizes_e);
+        assert_eq!(tokens_d, tokens_e);
     }
 }
