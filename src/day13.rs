@@ -6,7 +6,7 @@ use crate::util::{self, AocError};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 struct Pos(usize, usize);
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 struct Movement(usize, usize);
 
 impl Movement {
@@ -63,6 +63,16 @@ fn parse_machines(input: &str) -> Result<Vec<Machine>> {
     Ok(machines)
 }
 
+fn correct_machines(mut machines: Vec<Machine>) -> Vec<Machine> {
+    for machine in machines.iter_mut() {
+        let Pos(x, y) = &mut machine.prize;
+        *x += 10000000000000;
+        *y += 10000000000000;
+    }
+    machines
+}
+
+#[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 struct Node {
     tokens: usize,
@@ -83,6 +93,7 @@ impl PartialOrd for Node {
     }
 }
 
+#[allow(dead_code)]
 fn do_best_play(machine: Machine) -> Option<usize> {
     let Machine {
         button_a,
@@ -150,11 +161,125 @@ fn do_best_play(machine: Machine) -> Option<usize> {
     None
 }
 
-fn find_optimal_cost(machines: &Vec<Machine>) -> (usize, usize) {
+#[allow(dead_code)]
+fn find_optimal_cost_dijkstra(machines: &Vec<Machine>) -> (usize, usize) {
     let mut tokens = 0;
     let mut prizes = 0;
     for &machine in machines {
         if let Some(cost) = do_best_play(machine) {
+            tokens += cost;
+            prizes += 1;
+        };
+    }
+    (tokens, prizes)
+}
+
+fn check_steps_close_to(
+    machine: Machine,
+    expensive_steps: usize,
+    cheap_steps: usize,
+) -> Option<(usize, usize)> {
+    let Machine {
+        button_a,
+        button_b,
+        prize,
+    } = machine;
+    let Movement(expensive_x, expensive_y) = button_a;
+    let Movement(cheap_x, cheap_y) = button_b;
+
+    for i in 0..3 {
+        if i == 0 && cheap_steps == 0 {
+            continue;
+        };
+        let test_cheap = cheap_steps + i - 1;
+
+        for j in 0..3 {
+            if j == 0 && expensive_steps == 0 {
+                continue;
+            };
+            let test_expensive = expensive_steps + j - 1;
+
+            let got_x = test_cheap * cheap_x + test_expensive * expensive_x;
+            let got_y = test_cheap * cheap_y + test_expensive * expensive_y;
+            let got = Pos(got_x, got_y);
+
+            if got == prize {
+                return Some((test_expensive, test_cheap));
+            }
+        }
+    }
+    return None;
+}
+
+fn check_machine(machine: Machine) -> Option<usize> {
+    let Machine {
+        button_a,
+        button_b,
+        prize,
+    } = machine;
+    let Movement(expensive_x, expensive_y) = button_a;
+    let Movement(cheap_x, cheap_y) = button_b;
+    let Pos(target_x, target_y) = prize;
+
+    // edge case: both buttons move the same
+    if button_a == button_b {
+        // solve i * ax = tx
+        // solve i * ay = ty
+        let ax = cheap_x as f64;
+        let bx = cheap_y as f64;
+        let tx = target_x as f64;
+        let ty = target_y as f64;
+        let i = tx / ax;
+        let j = ty / bx;
+
+        let i = i.round() as usize;
+        let j = j.round() as usize;
+        if i.abs_diff(j) > 1 {
+            return None;
+        }
+        let Some((j, i)) = check_steps_close_to(machine, 0, i) else {
+            return None;
+        };
+        return Some(j * 3 + i);
+    }
+
+    // at least one button does not move diagonal
+    // solve i * ax + j * bx = tx
+    // solve i * ay + j * by = ty
+    let ax = cheap_x as f64;
+    let ay = cheap_y as f64;
+    let bx = expensive_x as f64;
+    let by = expensive_y as f64;
+    let tx = target_x as f64;
+    let ty = target_y as f64;
+
+    // 0      + j * by = ty
+    let by = by - (ay / ax) * bx;
+    let ty = ty - (ay / ax) * tx;
+
+    // 0      + j      = ty
+    let ty = ty / by;
+
+    // i * ax + 0      = tx
+    let tx = tx - bx * ty;
+
+    // i               = tx
+    let tx = tx / ax;
+
+    let cheap_steps = tx.round() as usize;
+    let expensive_steps = ty.round() as usize;
+
+    let Some((j, i)) = check_steps_close_to(machine, expensive_steps, cheap_steps) else {
+        return None;
+    };
+    Some(j * 3 + i)
+}
+
+fn find_optimal_cost_equation(machines: &Vec<Machine>) -> (usize, usize) {
+    let mut tokens = 0;
+    let mut prizes = 0;
+    for &machine in machines {
+        if let Some(cost) = check_machine(machine) {
             tokens += cost;
             prizes += 1;
         };
@@ -167,8 +292,12 @@ pub fn run() -> Result<()> {
     let path = PathBuf::from("./resources/day13.txt");
     let data = util::get_data_string(&path)?;
     let machines = parse_machines(&data)?;
-    let (tokens, prizes) = find_optimal_cost(&machines);
+    // let (tokens, prizes) = find_optimal_cost_dijkstra(&machines);
+    let (tokens, prizes) = find_optimal_cost_equation(&machines);
     println!("need {tokens} to win {prizes} prizes");
+    let machines = correct_machines(machines);
+    let (tokens, prizes) = find_optimal_cost_equation(&machines);
+    println!("after correction, need {tokens} to win {prizes} prizes");
     Ok(())
 }
 
@@ -182,7 +311,7 @@ mod tests {
 Button B: X+22, Y+67
 Prize: X=8400, Y=5400";
         let machine = parse_machines(input).unwrap();
-        let (tokens, prizes) = find_optimal_cost(&machine);
+        let (tokens, prizes) = find_optimal_cost_dijkstra(&machine);
         assert_eq!(prizes, 1);
         assert_eq!(tokens, 280);
     }
@@ -193,13 +322,13 @@ Prize: X=8400, Y=5400";
 Button B: X+67, Y+21
 Prize: X=12748, Y=12176";
         let machine = parse_machines(input).unwrap();
-        let (tokens, prizes) = find_optimal_cost(&machine);
+        let (tokens, prizes) = find_optimal_cost_dijkstra(&machine);
         assert_eq!(prizes, 0);
         assert_eq!(tokens, 0);
     }
 
     #[test]
-    fn test_two() {
+    fn test_two_machines() {
         let input = "Button A: X+94, Y+34
 Button B: X+22, Y+67
 Prize: X=8400, Y=5400
@@ -208,8 +337,63 @@ Button A: X+26, Y+66
 Button B: X+67, Y+21
 Prize: X=12748, Y=12176";
         let machines = parse_machines(input).unwrap();
-        let (tokens, prizes) = find_optimal_cost(&machines);
+        let (tokens, prizes) = find_optimal_cost_dijkstra(&machines);
         assert_eq!(prizes, 1);
         assert_eq!(tokens, 280);
+    }
+
+    #[test]
+    fn test_far_prize_1() {
+        let input = "Button A: X+94, Y+34
+Button B: X+22, Y+67
+Prize: X=8400, Y=5400";
+        let machine = parse_machines(input).unwrap();
+        let machine = correct_machines(machine);
+        let (_tokens, prizes) = find_optimal_cost_equation(&machine);
+        assert_eq!(prizes, 0);
+    }
+
+    #[test]
+    fn test_far_prize_2() {
+        let input = "Button A: X+26, Y+66
+Button B: X+67, Y+21
+Prize: X=12748, Y=12176";
+        let machine = parse_machines(input).unwrap();
+        let machine = correct_machines(machine);
+        let (_tokens, prizes) = find_optimal_cost_equation(&machine);
+        assert_eq!(prizes, 1);
+    }
+
+    #[test]
+    fn test_far_prize_3() {
+        let input = "Button A: X+17, Y+86
+Button B: X+84, Y+37
+Prize: X=7870, Y=6450";
+        let machine = parse_machines(input).unwrap();
+        let machine = correct_machines(machine);
+        let (_tokens, prizes) = find_optimal_cost_equation(&machine);
+        assert_eq!(prizes, 0);
+    }
+
+    #[test]
+    fn test_far_prize_4() {
+        let input = "Button A: X+69, Y+23
+Button B: X+27, Y+71
+Prize: X=18641, Y=10279";
+        let machine = parse_machines(input).unwrap();
+        let machine = correct_machines(machine);
+        let (_tokens, prizes) = find_optimal_cost_equation(&machine);
+        assert_eq!(prizes, 1);
+    }
+
+    #[test]
+    fn test_far_prize_same_as_old_solution() {
+        let path = PathBuf::from("./resources/day13.txt");
+        let data = util::get_data_string(&path).unwrap();
+        let machines = parse_machines(&data).unwrap();
+        let (tokens, prizes) = find_optimal_cost_dijkstra(&machines);
+        let (tokens_q, prizes_q) = find_optimal_cost_equation(&machines);
+        assert_eq!(prizes, prizes_q);
+        assert_eq!(tokens, tokens_q);
     }
 }
