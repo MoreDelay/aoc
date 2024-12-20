@@ -1,5 +1,4 @@
 use anyhow::Result;
-use core::panic;
 use std::{collections::BinaryHeap, path::PathBuf};
 
 use crate::util::{self, AocError};
