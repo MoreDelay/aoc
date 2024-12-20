@@ -61,9 +61,9 @@ pub fn get_data_rows(path: &Path) -> Result<Vec<Vec<usize>>> {
     Ok(result)
 }
 
-pub fn parse_tiles<T, F>(input: &str, parser: F) -> Result<Vec<Vec<T>>, AocError>
+pub fn parse_tiles<T, F>(input: &str, mut parser: F) -> Result<Vec<Vec<T>>, AocError>
 where
-    F: Fn(usize, usize, char) -> Result<T, AocError>,
+    F: FnMut(usize, usize, char) -> Result<T, AocError>,
 {
     let mut width = None;
     input
