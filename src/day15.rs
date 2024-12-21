@@ -102,7 +102,7 @@ impl Warehouse {
                     continue;
                 }
             }
-            smallest = box2.and_then(|box2| Some(box2.0)).or_else(|| Some(box1.0));
+            smallest = box2.map(|box2| box2.0).or(Some(box1.0));
 
             pushed.push(box1);
             if let Some(box2) = box2 {
@@ -139,10 +139,10 @@ impl Warehouse {
             }
         }
 
-        return true;
+        true
     }
 
-    fn execute_protocol(&mut self, moves: &Vec<Direction>) {
+    fn execute_protocol(&mut self, moves: &[Direction]) {
         // println!("start:\n{self}");
         for &dir in moves.iter() {
             self.move_and_push_boxes(dir);
@@ -154,14 +154,13 @@ impl Warehouse {
         self.tiles
             .iter()
             .enumerate()
-            .map(|(y, row)| {
+            .flat_map(|(y, row)| {
                 row.iter().enumerate().map(move |(x, t)| match t {
                     Tile::SmallBox => y * 100 + x,
                     Tile::BigBoxL => y * 100 + x,
                     _ => 0,
                 })
             })
-            .flatten()
             .sum()
     }
 }
@@ -190,7 +189,7 @@ fn parse_small_warehouse(input: &str) -> Result<(Warehouse, Vec<Direction>)> {
     let Some(moves) = split_iter.next() else {
         return Err(AocError::ParseError.into());
     };
-    if !split_iter.next().is_none() {
+    if split_iter.next().is_some() {
         return Err(AocError::ParseError.into());
     };
 
@@ -237,7 +236,7 @@ fn parse_big_warehouse(input: &str) -> Result<(Warehouse, Vec<Direction>)> {
     let Some(moves) = split_iter.next() else {
         return Err(AocError::ParseError.into());
     };
-    if !split_iter.next().is_none() {
+    if split_iter.next().is_some() {
         return Err(AocError::ParseError.into());
     };
 

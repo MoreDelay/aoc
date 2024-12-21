@@ -63,7 +63,7 @@ struct Map {
 impl Map {
     fn parse(input: &str) -> Result<Map> {
         let parser = |_, _, c| Tile::try_from(c);
-        let data = util::parse_tiles(&input, parser)?;
+        let data = util::parse_tiles(input, parser)?;
         let height = data.len();
         let width = if height > 0 { data[0].len() } else { 0 };
         Ok(Map {
@@ -153,7 +153,7 @@ mod tests {
 51238
 55559
 55555";
-        let map = Map::parse(&data).unwrap();
+        let map = Map::parse(data).unwrap();
         let (score, rating) = get_map_score_and_rating(&map);
         assert_eq!(score, 1);
         assert_eq!(rating, 1);
@@ -166,7 +166,7 @@ mod tests {
 51238
 54389
 55675";
-        let map = Map::parse(&data).unwrap();
+        let map = Map::parse(data).unwrap();
         let (score, rating) = get_map_score_and_rating(&map);
         assert_eq!(score, 1);
         assert_eq!(rating, 2);

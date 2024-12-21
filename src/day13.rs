@@ -32,7 +32,7 @@ struct Machine {
 fn parse_machines(input: &str) -> Result<Vec<Machine>> {
     let rows = input
         .split("\n")
-        .filter(|s| s.len() != 0)
+        .filter(|s| !s.is_empty())
         .collect::<Vec<_>>();
     let machines = rows
         .chunks(3)
@@ -206,7 +206,7 @@ fn check_steps_close_to(
             }
         }
     }
-    return None;
+    None
 }
 
 fn check_machine(machine: Machine) -> Option<usize> {
@@ -266,8 +266,7 @@ fn check_machine(machine: Machine) -> Option<usize> {
         (ty.round() as usize, tx.round() as usize)
     };
 
-    check_steps_close_to(machine, expensive_steps, cheap_steps)
-        .map_or(None, |(a, b)| Some(a * 3 + b))
+    check_steps_close_to(machine, expensive_steps, cheap_steps).map(|(a, b)| a * 3 + b)
 }
 
 fn find_optimal_cost_equation(machines: &Vec<Machine>) -> (usize, usize) {

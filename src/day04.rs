@@ -13,7 +13,7 @@ fn mapping_fn(c: char, mapping: &str) -> u8 {
 fn convert_to_vec_of_vecs(input: &str, mapping: &str) -> Vec<Vec<u8>> {
     let res = input
         .split("\n")
-        .filter(|s| s.len() > 0)
+        .filter(|s| !s.is_empty())
         .map(|s| {
             s.chars()
                 .map(|c| mapping_fn(c, mapping))
@@ -22,7 +22,7 @@ fn convert_to_vec_of_vecs(input: &str, mapping: &str) -> Vec<Vec<u8>> {
         .collect::<Vec<_>>();
 
     // make sure each inner vector has the same length
-    if res.len() > 0 {
+    if !res.is_empty() {
         let length = res[0].len();
         res.iter().skip(1).for_each(|v| assert_eq!(v.len(), length));
     }
@@ -31,16 +31,16 @@ fn convert_to_vec_of_vecs(input: &str, mapping: &str) -> Vec<Vec<u8>> {
 
 fn cmp_fwd_bwd(mut container: Vec<u8>, pattern: &[u8]) -> usize {
     let mut total = 0;
-    total += (&container == pattern) as usize;
+    total += (container == pattern) as usize;
     container.reverse();
-    total += (&container == pattern) as usize;
+    total += (container == pattern) as usize;
     total
 }
 
 fn cmp_x_diagonals(mut diag1: Vec<u8>, mut diag2: Vec<u8>, pattern: &[u8]) -> usize {
     assert_eq!(diag1.len(), diag2.len());
 
-    fn rotate(diag1: &mut Vec<u8>, diag2: &mut Vec<u8>) {
+    fn rotate(diag1: &mut [u8], diag2: &mut [u8]) {
         let last = diag2.len() - 1;
         std::mem::swap(&mut diag2[last], &mut diag1[0]);
         std::mem::swap(&mut diag1[0], &mut diag2[0]);
@@ -58,7 +58,7 @@ fn cmp_x_diagonals(mut diag1: Vec<u8>, mut diag2: Vec<u8>, pattern: &[u8]) -> us
     total
 }
 
-fn find_pattern_1d(x: usize, y: usize, data: &Vec<Vec<u8>>, pattern: &[u8]) -> usize {
+fn find_pattern_1d(x: usize, y: usize, data: &[Vec<u8>], pattern: &[u8]) -> usize {
     let mut total = 0;
 
     // horizontal
@@ -88,7 +88,7 @@ fn find_pattern_1d(x: usize, y: usize, data: &Vec<Vec<u8>>, pattern: &[u8]) -> u
     total
 }
 
-fn find_pattern_2d(x: usize, y: usize, data: &Vec<Vec<u8>>, pattern: &[u8]) -> usize {
+fn find_pattern_2d(x: usize, y: usize, data: &[Vec<u8>], pattern: &[u8]) -> usize {
     let mut total = 0;
 
     if x + pattern.len() <= data[0].len() && y + pattern.len() <= data.len() {
@@ -103,9 +103,9 @@ fn find_pattern_2d(x: usize, y: usize, data: &Vec<Vec<u8>>, pattern: &[u8]) -> u
     total
 }
 
-fn find_patterns<'a, F>(data: &'a Vec<Vec<u8>>, find_pattern: F) -> usize
+fn find_patterns<'a, F>(data: &'a [Vec<u8>], find_pattern: F) -> usize
 where
-    F: Fn(usize, usize, &'a Vec<Vec<u8>>) -> usize,
+    F: Fn(usize, usize, &'a [Vec<u8>]) -> usize,
 {
     let mut total = 0;
     for y in 0..data.len() {

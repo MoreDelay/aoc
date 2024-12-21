@@ -14,7 +14,7 @@ impl Rule {
 fn parse_rules(input: &str) -> Result<Vec<Rule>> {
     input
         .split("\n")
-        .filter(|s| s.len() != 0)
+        .filter(|s| !s.is_empty())
         .map(|s| {
             let (left, right) = s.split_once("|").ok_or(AocError::ParseError)?;
             let left = left.parse::<usize>()?;
@@ -27,10 +27,10 @@ fn parse_rules(input: &str) -> Result<Vec<Rule>> {
 fn parse_updates(input: &str) -> Result<Vec<Vec<usize>>> {
     input
         .split("\n")
-        .filter(|s| s.len() != 0)
+        .filter(|s| !s.is_empty())
         .map(|s| {
             s.split(",")
-                .filter(|s| s.len() != 0)
+                .filter(|s| !s.is_empty())
                 .map(|s| Ok(s.parse::<usize>()?))
                 .collect()
         })
@@ -44,11 +44,11 @@ fn separate_input(input: &str) -> Result<(Vec<Rule>, Vec<Vec<usize>>)> {
     Ok((rules, updates))
 }
 
-fn all_rules_upheld(left: usize, right: usize, rules: &Vec<Rule>) -> bool {
+fn all_rules_upheld(left: usize, right: usize, rules: &[Rule]) -> bool {
     rules.iter().map(|rule| rule.upheld(left, right)).all(|b| b)
 }
 
-fn update_upholds_rules(update: &[usize], rules: &Vec<Rule>) -> bool {
+fn update_upholds_rules(update: &[usize], rules: &[Rule]) -> bool {
     update
         .windows(2)
         .flat_map(<&[usize; 2]>::try_from)
@@ -114,9 +114,8 @@ pub fn run() -> Result<()> {
         .filter(|u| !update_upholds_rules(u, &rules))
         .map(|u| {
             quick_sort(u, &sort_criterion);
-            u
+            u[u.len() / 2]
         })
-        .map(|u| u[u.len() / 2])
         .sum::<usize>();
     println!("mid sum of incorrect updates: {mid_sum_incorrect}");
 

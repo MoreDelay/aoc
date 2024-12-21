@@ -7,7 +7,7 @@ struct Mul(usize, usize);
 
 fn parse_mul(input: &str) -> Vec<Mul> {
     let mut result = Vec::new();
-    let mut remaining = &input[..];
+    let mut remaining = input;
     const MAX_PATTERN: usize = 12;
 
     fn parse_val(s: &str) -> Option<usize> {
@@ -18,7 +18,7 @@ fn parse_mul(input: &str) -> Vec<Mul> {
         }
     }
 
-    while remaining.len() > 0 {
+    while !remaining.is_empty() {
         let Some(start_index) = remaining.find("mul(") else {
             break;
         };
@@ -52,9 +52,9 @@ fn parse_mul(input: &str) -> Vec<Mul> {
 
 fn parse_mul_conditional(input: &str) -> Vec<Mul> {
     let mut result = Vec::new();
-    let mut remaining = &input[..];
+    let mut remaining = input;
 
-    while remaining.len() > 0 {
+    while !remaining.is_empty() {
         // we are always enabled at the beginning of a loop
         let Some(dont_index) = remaining.find("don't()") else {
             result.extend(parse_mul(remaining));

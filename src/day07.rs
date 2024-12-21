@@ -11,7 +11,7 @@ struct Equation {
 fn generate_equations(input: &str) -> Result<Vec<Equation>> {
     input
         .split("\n")
-        .filter(|s| s.len() != 0)
+        .filter(|s| !s.is_empty())
         .map(|s| {
             let split_index = s.find(':').ok_or(AocError::ParseError)?;
             let (value, rest) = s.split_at(split_index);
@@ -21,7 +21,7 @@ fn generate_equations(input: &str) -> Result<Vec<Equation>> {
                 .split_whitespace()
                 .map(|o| Ok(o.parse()?))
                 .collect::<Result<Vec<_>>>()?;
-            if operands.len() == 0 {
+            if operands.is_empty() {
                 return Err(AocError::ParseError.into());
             }
             Ok(Equation {
@@ -55,12 +55,13 @@ fn can_construct_equation(equation: &Equation) -> bool {
         next_op: NextOperators::Mul,
     };
     stack.push(initial_state);
-    while !stack.is_empty() {
+    while let Some(top) = stack.pop() {
         let State {
             index,
             result,
             next_op,
-        } = stack.pop().expect("stack not empty");
+        } = top;
+
         let next_index = index + 1;
         if next_index == values.len() {
             if result == *target {
@@ -113,12 +114,13 @@ fn can_construct_equation_with_concat(equation: &Equation) -> bool {
         next_op: NextOperators::Mul,
     };
     stack.push(initial_state);
-    while !stack.is_empty() {
+    while let Some(top) = stack.pop() {
         let State {
             index,
             result,
             next_op,
-        } = stack.pop().expect("stack not empty");
+        } = top;
+
         let next_index = index + 1;
         if next_index == values.len() {
             if result == *target {
@@ -155,7 +157,7 @@ fn can_construct_equation_with_concat(equation: &Equation) -> bool {
                     next_op: NextOperators::Done,
                 });
                 let mut concatted = result.to_string();
-                concatted.extend(next_value.to_string().chars());
+                concatted.push_str(&next_value.to_string());
                 concatted.parse().unwrap()
             }
             NextOperators::Done => continue,

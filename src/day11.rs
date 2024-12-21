@@ -30,12 +30,12 @@ impl TryFrom<&str> for Stone {
     type Error = AocError;
 
     fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
-        if s.len() == 0 {
-            let s = format!("can not make stone from: {s}");
+        if s.is_empty() {
+            let s = "can not make stone from empty str".to_string();
             return Err(AocError::ValueError(s));
         }
         let s = s.trim_start_matches("00");
-        if s.len() == 0 {
+        if s.is_empty() {
             return Ok(Stone(0));
         }
 
@@ -50,7 +50,7 @@ impl TryFrom<&str> for Stone {
 fn parse_stones(input: &str) -> Result<Vec<Stone>> {
     input
         .split_whitespace()
-        .filter(|s| s.len() != 0)
+        .filter(|s| !s.is_empty())
         .map(|s| Ok(Stone(s.parse::<usize>()?)))
         .collect()
 }

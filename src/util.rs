@@ -68,7 +68,7 @@ where
     let mut width = None;
     input
         .split("\n")
-        .filter(|s| s.len() != 0)
+        .filter(|s| !s.is_empty())
         .enumerate()
         .map(|(y, s)| {
             let row = s

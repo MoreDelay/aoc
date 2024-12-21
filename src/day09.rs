@@ -49,7 +49,7 @@ fn get_layout(input: &str) -> Result<Layout> {
             let d = c
                 .to_digit(10)
                 .map(|d| d as usize)
-                .ok_or_else(|| AocError::ParseError);
+                .ok_or(AocError::ParseError);
             Ok(d?)
         })
         .collect::<Result<Vec<_>>>()?;
@@ -62,7 +62,6 @@ fn get_layout(input: &str) -> Result<Layout> {
                 count: digit,
             };
             blocks.push(new_block);
-        } else {
         }
         last_end += digit;
     }
@@ -119,11 +118,10 @@ fn defragment_blockwise(layout: &Layout) -> Layout {
         }
     }
 
-    let new_layout = Layout {
+    Layout {
         blocks: new_blocks,
         size: layout.size,
-    };
-    new_layout
+    }
 }
 
 fn compute_checksum(layout: &Layout) -> usize {
@@ -160,11 +158,10 @@ fn defrag_filewise(layout: &Layout) -> Layout {
 
     new_blocks.sort_by(|l, r| l.start.cmp(&r.start));
 
-    let new_layout = Layout {
+    Layout {
         blocks: new_blocks,
         size: layout.size,
-    };
-    new_layout
+    }
 }
 
 pub fn run() -> Result<()> {

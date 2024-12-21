@@ -12,7 +12,6 @@ pub fn run() -> Result<()> {
     right.sort();
 
     let distance: usize = zip(&mut *left, &mut *right)
-        .into_iter()
         .map(|(a, b)| a.abs_diff(*b))
         .sum();
     println!("distance={distance}");

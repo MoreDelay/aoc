@@ -377,8 +377,7 @@ fn get_bulk_price_at(pos: Pos, plot: &mut Plot) -> usize {
         queue.push_back(down);
     }
 
-    let price = sides * fields;
-    price
+    sides * fields
 }
 
 fn get_perimeter_price_bulk(mut plot: Plot) -> usize {

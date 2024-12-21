@@ -56,7 +56,7 @@ impl Map {
     }
 }
 
-fn antinode_at(tiles: &Vec<Vec<Tile>>, near: Antenna, far: Antenna) -> Option<(usize, usize)> {
+fn antinode_at(tiles: &[Vec<Tile>], near: Antenna, far: Antenna) -> Option<(usize, usize)> {
     let Antenna {
         pos: (x_near, y_near),
     } = near;
@@ -100,7 +100,7 @@ fn set_antinodes(map: &mut Map) {
     }
 }
 
-fn set_harmonics_line(tiles: &mut Vec<Vec<Tile>>, mut near: Antenna, mut far: Antenna) {
+fn set_harmonics_line(tiles: &mut [Vec<Tile>], mut near: Antenna, mut far: Antenna) {
     while let Some((x, y)) = antinode_at(tiles, near, far) {
         tiles[y][x].activate();
         far = near;

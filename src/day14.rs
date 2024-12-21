@@ -27,8 +27,8 @@ impl Robot {
         let Velocity(vx, vy) = self.vel;
         let Pos(mx, my) = max;
         self.pos = Pos(
-            (px + (mx as isize + vx) as usize) % mx as usize,
-            (py + (my as isize + vy) as usize) % my as usize,
+            (px + (mx as isize + vx) as usize) % mx,
+            (py + (my as isize + vy) as usize) % my,
         );
     }
 }
@@ -57,7 +57,7 @@ impl std::fmt::Display for Map {
 fn parse_robo_map(input: &str, size: Pos) -> Result<Map> {
     let robots = input
         .split("\n")
-        .filter(|s| s.len() != 0)
+        .filter(|s| !s.is_empty())
         .map(|s| {
             let Some((pos, vel)) = s.trim().split_once(" ") else {
                 return Err(AocError::ParseError.into());

@@ -179,7 +179,7 @@ impl Map {
         let mut n_rows = None;
         let tiles = input
             .split("\n")
-            .filter(|s| s.len() != 0)
+            .filter(|s| !s.is_empty())
             .enumerate()
             .map(|(y, s)| {
                 let rows = s
@@ -215,9 +215,7 @@ impl Map {
     }
 
     fn next_pos(&self) -> Option<(usize, usize)> {
-        let Some((x, y)) = self.guard_pos else {
-            return None;
-        };
+        let (x, y) = self.guard_pos?;
         let Tile::Guard(guard, _) = self.tiles[y][x] else {
             return None;
         };
@@ -370,22 +368,12 @@ pub fn run() -> Result<()> {
     let mut map = Map::new(&data)?;
     let mut loop_map = map.clone();
 
-    loop {
-        match map.step() {
-            State::Ongoing => (),
-            State::Complete => break,
-        }
-    }
+    while let State::Ongoing = map.step() {}
     let visited = map.visited;
     println!("visited: {visited}");
 
     let first_step_loops = map.would_loop_here();
-    loop {
-        match loop_map.step_and_count_loops() {
-            State::Ongoing => (),
-            State::Complete => break,
-        }
-    }
+    while let State::Ongoing = loop_map.step_and_count_loops() {}
     let loops = match first_step_loops {
         true => loop_map.loops - 1,
         false => loop_map.loops,
