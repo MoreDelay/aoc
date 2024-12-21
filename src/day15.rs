@@ -11,11 +11,13 @@ enum Direction {
     Left,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Tile {
     Empty,
     Wall,
-    Box,
+    SmallBox,
+    BigBoxL,
+    BigBoxR,
     Robot,
 }
 
@@ -24,7 +26,9 @@ impl std::fmt::Display for Tile {
         match self {
             Tile::Empty => f.write_char('.'),
             Tile::Wall => f.write_char('#'),
-            Tile::Box => f.write_char('O'),
+            Tile::SmallBox => f.write_char('O'),
+            Tile::BigBoxL => f.write_char('['),
+            Tile::BigBoxR => f.write_char(']'),
             Tile::Robot => f.write_char('@'),
         }
     }
@@ -61,30 +65,80 @@ impl Warehouse {
         }
     }
 
-    fn move_and_push_boxes(&mut self, dir: Direction) -> bool {
-        let first_pos = self.neighbor_pos(self.robot, dir);
-        let mut current_pos = first_pos;
-        loop {
-            let Some(pos) = current_pos else { return false };
-            match self.at(pos) {
-                Tile::Empty => break,
-                Tile::Wall => return false,
-                Tile::Box => current_pos = self.neighbor_pos(pos, dir),
-                Tile::Robot => unreachable!(),
+    // returns None if any position is blocked by a wall
+    fn find_pushed_boxes(&self, dir: Direction, pushing: &Vec<Pos>) -> Option<Vec<Pos>> {
+        // push in ascending order (x-coord) per row
+        let mut pushed = Vec::new();
+        // keep track of smallest index so that we do not duplicate work later (diamond problem)
+        let mut smallest = None;
+
+        for &pos in pushing {
+            let Some(neighbor) = self.neighbor_pos(pos, dir) else {
+                return None; // can not push box out of bounds
+            };
+            let tile = self.at(neighbor);
+            let (box1, box2) = match (tile, dir) {
+                (Tile::Empty, _) => continue,
+                (Tile::Wall, _) => return None,
+                (Tile::SmallBox, _) => (neighbor, None),
+                (Tile::BigBoxL, Direction::Up | Direction::Down) => {
+                    let box_l = neighbor;
+                    let box_r = self.neighbor_pos(neighbor, Direction::Right).unwrap();
+                    (box_l, Some(box_r))
+                }
+                (Tile::BigBoxR, Direction::Up | Direction::Down) => {
+                    let box_l = self.neighbor_pos(neighbor, Direction::Left).unwrap();
+                    let box_r = neighbor;
+                    (box_l, Some(box_r))
+                }
+                (Tile::BigBoxL, _) => (neighbor, None),
+                (Tile::BigBoxR, _) => (neighbor, None),
+                (Tile::Robot, _) => unreachable!(),
+            };
+
+            if let Some(smallest) = smallest {
+                let Pos(x, _y) = box1;
+                if x <= smallest {
+                    continue;
+                }
+            }
+            smallest = box2.and_then(|box2| Some(box2.0)).or_else(|| Some(box1.0));
+
+            pushed.push(box1);
+            if let Some(box2) = box2 {
+                pushed.push(box2);
             }
         }
-        let Some(last_pos) = current_pos else {
-            return false;
-        };
-        let first_pos = first_pos.unwrap();
+        Some(pushed)
+    }
 
-        if last_pos != first_pos {
-            self.set(last_pos, Tile::Box);
+    fn move_and_push_boxes(&mut self, dir: Direction) -> bool {
+        let mut pushed_rows = Vec::new();
+
+        let mut pushing = vec![self.robot];
+        pushed_rows.push(pushing.clone());
+
+        while !pushing.is_empty() {
+            let Some(pushed) = self.find_pushed_boxes(dir, &pushing) else {
+                return false;
+            };
+            pushed_rows.push(pushed.clone());
+            pushing = pushed;
         }
 
-        self.set(self.robot, Tile::Empty);
-        self.set(first_pos, Tile::Robot);
-        self.robot = first_pos;
+        for row in pushed_rows.iter().rev() {
+            for &pos in row {
+                let tile = self.at(pos);
+                let empty = self.neighbor_pos(pos, dir).unwrap();
+                // println!("push {tile} from {pos:?} to {empty:?}");
+                self.set(empty, tile);
+                self.set(pos, Tile::Empty);
+                if let Tile::Robot = tile {
+                    self.robot = empty;
+                }
+            }
+        }
+
         return true;
     }
 
@@ -102,7 +156,8 @@ impl Warehouse {
             .enumerate()
             .map(|(y, row)| {
                 row.iter().enumerate().map(move |(x, t)| match t {
-                    Tile::Box => y * 100 + x,
+                    Tile::SmallBox => y * 100 + x,
+                    Tile::BigBoxL => y * 100 + x,
                     _ => 0,
                 })
             })
@@ -127,7 +182,7 @@ impl std::fmt::Display for Warehouse {
     }
 }
 
-fn parse_warehouse(input: &str) -> Result<(Warehouse, Vec<Direction>)> {
+fn parse_small_warehouse(input: &str) -> Result<(Warehouse, Vec<Direction>)> {
     let mut split_iter = input.split("\n\n");
     let Some(tiles) = split_iter.next() else {
         return Err(AocError::ParseError.into());
@@ -155,7 +210,7 @@ fn parse_warehouse(input: &str) -> Result<(Warehouse, Vec<Direction>)> {
     let parser = |x, y, c| match c {
         '.' => Ok(Tile::Empty),
         '#' => Ok(Tile::Wall),
-        'O' => Ok(Tile::Box),
+        'O' => Ok(Tile::SmallBox),
         '@' if robot_at.is_none() => {
             robot_at = Some(Pos(x, y));
             Ok(Tile::Robot)
@@ -174,11 +229,68 @@ fn parse_warehouse(input: &str) -> Result<(Warehouse, Vec<Direction>)> {
     Ok((warehouse, moves))
 }
 
+fn parse_big_warehouse(input: &str) -> Result<(Warehouse, Vec<Direction>)> {
+    let mut split_iter = input.split("\n\n");
+    let Some(tiles) = split_iter.next() else {
+        return Err(AocError::ParseError.into());
+    };
+    let Some(moves) = split_iter.next() else {
+        return Err(AocError::ParseError.into());
+    };
+    if !split_iter.next().is_none() {
+        return Err(AocError::ParseError.into());
+    };
+
+    let moves = moves
+        .chars()
+        .filter(|&c| c != '\n')
+        .map(|c| match c {
+            '^' => Ok(Direction::Up),
+            '>' => Ok(Direction::Right),
+            'v' => Ok(Direction::Down),
+            '<' => Ok(Direction::Left),
+            _ => Err(AocError::ParseError),
+        })
+        .collect::<Result<Vec<_>, AocError>>()?;
+
+    // parser creates 2 tiles per character
+    let mut robot_at = None;
+    let parser = |x, y, c| match c {
+        '.' => Ok([Tile::Empty, Tile::Empty]),
+        '#' => Ok([Tile::Wall, Tile::Wall]),
+        'O' => Ok([Tile::BigBoxL, Tile::BigBoxR]),
+        '@' if robot_at.is_none() => {
+            robot_at = Some(Pos(x * 2, y));
+            Ok([Tile::Robot, Tile::Empty])
+        }
+        _ => Err(AocError::ParseError),
+    };
+    let tiles = util::parse_tiles(tiles, parser)?;
+    // flatten lowest level
+    let tiles: Vec<Vec<_>> = tiles
+        .into_iter()
+        .map(|r| r.into_iter().flatten().collect())
+        .collect();
+
+    let Some(robot) = robot_at else {
+        return Err(AocError::ParseError.into());
+    };
+    // when we know where the robot is, we know we have at least one row
+    let size = Pos(tiles[0].len(), tiles.len());
+
+    let warehouse = Warehouse { size, robot, tiles };
+    Ok((warehouse, moves))
+}
+
 pub fn run() -> Result<()> {
     println!("day 15");
     let path = PathBuf::from("./resources/day15.txt");
     let data = util::get_data_string(&path)?;
-    let (mut warehouse, moves) = parse_warehouse(&data)?;
+    let (mut warehouse, moves) = parse_small_warehouse(&data)?;
+    warehouse.execute_protocol(&moves);
+    let gps_sum = warehouse.compute_gps_sum();
+    println!("GPS sum: {gps_sum}");
+    let (mut warehouse, moves) = parse_big_warehouse(&data)?;
     warehouse.execute_protocol(&moves);
     let gps_sum = warehouse.compute_gps_sum();
     println!("GPS sum: {gps_sum}");
@@ -190,7 +302,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_warehouse() {
+    fn test_parse_small_warehouse() {
         let input = "##########
 #..O..O.O#
 #......O.#
@@ -204,7 +316,7 @@ mod tests {
 
 <vv>^<v^>v>^vv^v>v<>v^v<v<^vv<<<^><<><>>v<vvv<>^v^>^<<<><<v<<<v^vv^v>^
 v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
-        let (warehouse, moves) = parse_warehouse(input).unwrap();
+        let (warehouse, moves) = parse_small_warehouse(input).unwrap();
         let Pos(width, height) = warehouse.size;
 
         assert_eq!(width, 10);
@@ -212,10 +324,54 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
         assert_eq!(warehouse.tiles[0].len(), width);
         assert_eq!(warehouse.tiles.len(), height);
         assert_eq!(moves.len(), 140);
+
+        let robot_tile = warehouse.at(warehouse.robot);
+        assert_eq!(robot_tile, Tile::Robot);
     }
 
     #[test]
-    fn test_example() {
+    fn test_parse_big_warehouse() {
+        let input = "##########
+#..O..O.O#
+#......O.#
+#.OO..O.O#
+#..O@..O.#
+#O#..O...#
+#O..O..O.#
+#.OO.O.OO#
+#....O...#
+##########
+
+<vv>^<v^>v>^vv^v>v<>v^v<v<^vv<<<^><<><>>v<vvv<>^v^>^<<<><<v<<<v^vv^v>^
+v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
+        let (warehouse, moves) = parse_big_warehouse(input).unwrap();
+        let Pos(width, height) = warehouse.size;
+
+        assert_eq!(width, 20);
+        assert_eq!(height, 10);
+        assert_eq!(warehouse.tiles[0].len(), width);
+        assert_eq!(warehouse.tiles.len(), height);
+        assert_eq!(moves.len(), 140);
+
+        let robot_tile = warehouse.at(warehouse.robot);
+        assert_eq!(robot_tile, Tile::Robot);
+
+        let expected = "####################
+##....[]....[]..[]##
+##............[]..##
+##..[][]....[]..[]##
+##....[]@.....[]..##
+##[]##....[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################";
+        let output = format!("{warehouse}");
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_example_small() {
         let input = "##########
 #..O..O.O#
 #......O.#
@@ -237,7 +393,7 @@ vvv<<^>^v^^><<>>><>^<<><^vv^^<>vvv<>><^^v>^>vv<>v<<<<v<^v>^<^^>>>^<v<v
 <><^^>^^^<><vvvvv^v<v<<>^v<v>v<<^><<><<><<<^^<<<^<<>><<><^^^>^^<>^>v<>
 ^^>vv<^v^v<vv>^<><v<^v>^^^>>>^^vvv^>vvv<>>>^<^>>>>>^<<^v>^vvv<>^<><<v>
 v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
-        let (mut warehouse, moves) = parse_warehouse(input).unwrap();
+        let (mut warehouse, moves) = parse_small_warehouse(input).unwrap();
         warehouse.execute_protocol(&moves);
         let expected = "##########
 #.O.O.OOO#
@@ -253,5 +409,46 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
         assert_eq!(output, expected);
         let gps_sum = warehouse.compute_gps_sum();
         assert_eq!(gps_sum, 10092);
+    }
+
+    #[test]
+    fn test_example_big() {
+        let input = "##########
+#..O..O.O#
+#......O.#
+#.OO..O.O#
+#..O@..O.#
+#O#..O...#
+#O..O..O.#
+#.OO.O.OO#
+#....O...#
+##########
+
+<vv>^<v^>v>^vv^v>v<>v^v<v<^vv<<<^><<><>>v<vvv<>^v^>^<<<><<v<<<v^vv^v>^
+vvv<<^>^v^^><<>>><>^<<><^vv^^<>vvv<>><^^v>^>vv<>v<<<<v<^v>^<^^>>>^<v<v
+><>vv>v^v^<>><>>>><^^>vv>v<^^^>>v^v^<^^>v^^>v^<^v>v<>>v^v^<v>v^^<^^vv<
+<<v<^>>^^^^>>>v^<>vvv^><v<<<>^^^vv^<vvv>^>v<^^^^v<>^>vvvv><>>v^<<^^^^^
+^><^><>>><>^^<<^^v>>><^<v>^<vv>>v>>>^v><>^v><<<<v>>v<v<v>vvv>^<><<>^><
+^>><>^v<><^vvv<^^<><v<<<<<><^v<<<><<<^^<v<^^^><^>>^<v^><<<^>>^v<v^v<v^
+>^>>^v>vv>^<<^v<>><<><<v<<v><>v<^vv<<<>^^v^>^^>>><<^v>>v^v><^^>>^<>vv^
+<><^^>^^^<><vvvvv^v<v<<>^v<v>v<<^><<><<><<<^^<<<^<<>><<><^^^>^^<>^>v<>
+^^>vv<^v^v<vv>^<><v<^v>^^^>>>^^vvv^>vvv<>>>^<^>>>>>^<<^v>^vvv<>^<><<v>
+v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
+        let (mut warehouse, moves) = parse_big_warehouse(input).unwrap();
+        warehouse.execute_protocol(&moves);
+        let expected = "####################
+##[].......[].[][]##
+##[]...........[].##
+##[]........[][][]##
+##[]......[]....[]##
+##..##......[]....##
+##..[]............##
+##..@......[].[][]##
+##......[][]..[]..##
+####################";
+        let output = format!("{warehouse}");
+        assert_eq!(output, expected);
+        let gps_sum = warehouse.compute_gps_sum();
+        assert_eq!(gps_sum, 9021);
     }
 }
