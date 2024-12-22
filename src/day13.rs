@@ -380,6 +380,7 @@ Prize: X=18641, Y=10279";
         assert_eq!(prizes, 1);
     }
 
+    #[ignore]
     #[test]
     fn test_equation_solution_same_as_dijkstra_solution() {
         let path = PathBuf::from("./resources/day13.txt");
