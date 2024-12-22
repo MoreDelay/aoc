@@ -242,7 +242,7 @@ impl Dijkstra<Init> {
                 pos,
                 facing,
                 points,
-                ..
+                ref last,
             } = node;
 
             if self.best_points.is_some_and(|p| p < points) {
@@ -250,7 +250,22 @@ impl Dijkstra<Init> {
                 break;
             }
 
+            // try to piggyback when previously here
             let current_tile = self.maze.at(pos);
+            if let Some(prev_index) = current_tile.visited(facing) {
+                let prev_node = &mut self.nodes[prev_index];
+                if prev_node.points > points {
+                    unreachable!();
+                }
+                if prev_node.points == points {
+                    prev_node.last.extend(last);
+                }
+                continue;
+            }
+
+            // have not been here yet, so prepare another step
+            self.maze.at_mut(pos).visit(facing, cur_index);
+
             if let Tile::End(_) = current_tile {
                 assert!(self.best_points.is_none_or(|p| p == points));
                 self.best_points = Some(points);
@@ -267,74 +282,46 @@ impl Dijkstra<Init> {
             // add new node for turning left
             let facing_left = facing.turn_left();
             if left != Tile::Wall {
-                if let Some(prev_index) = current_tile.visited(facing_left) {
-                    let prev_node = &mut self.nodes[prev_index];
-                    if prev_node.points == points + 1000 {
-                        prev_node.last.push(cur_index);
-                    }
-                } else {
-                    let new_index = self.nodes.len();
-                    let new_node = MoveNode {
-                        pos,
-                        facing: facing_left,
-                        points: points + 1000,
-                        last: vec![cur_index],
-                    };
-                    self.unvisited.push(new_index);
-                    self.nodes.push(new_node);
-
-                    self.maze.at_mut(pos).visit(facing_left, new_index);
-                }
+                let new_index = self.nodes.len();
+                let new_node = MoveNode {
+                    pos,
+                    facing: facing_left,
+                    points: points + 1000,
+                    last: vec![cur_index],
+                };
+                self.unvisited.push(new_index);
+                self.nodes.push(new_node);
             }
 
             // add new node for turning right
             let facing_right = facing.turn_right();
             if right != Tile::Wall {
-                if let Some(prev_index) = current_tile.visited(facing_right) {
-                    let prev_node = &mut self.nodes[prev_index];
-                    if prev_node.points == points + 1000 {
-                        prev_node.last.push(cur_index);
-                    }
-                } else {
-                    let new_index = self.nodes.len();
-                    let new_node = MoveNode {
-                        pos,
-                        facing: facing_right,
-                        points: points + 1000,
-                        last: vec![cur_index],
-                    };
-                    self.unvisited.push(new_index);
-                    self.nodes.push(new_node);
-
-                    self.maze.at_mut(pos).visit(facing_right, new_index);
-                }
+                let new_index = self.nodes.len();
+                let new_node = MoveNode {
+                    pos,
+                    facing: facing_right,
+                    points: points + 1000,
+                    last: vec![cur_index],
+                };
+                self.unvisited.push(new_index);
+                self.nodes.push(new_node);
             }
 
+            // add new node for moving forward
             let Some(new_pos) = self.maze.neighbor_pos(pos, facing) else {
                 continue;
             };
-
-            // add new node for moving forward
             let tile_ahead = self.maze.at(new_pos);
             if tile_ahead != Tile::Wall {
-                if let Some(prev_index) = tile_ahead.visited(facing) {
-                    let prev_node = &mut self.nodes[prev_index];
-                    if prev_node.points == points + 1 {
-                        prev_node.last.push(cur_index);
-                    }
-                } else {
-                    let new_index = self.nodes.len();
-                    let new_node = MoveNode {
-                        pos: new_pos,
-                        facing,
-                        points: points + 1,
-                        last: vec![cur_index],
-                    };
-                    self.unvisited.push(new_index);
-                    self.nodes.push(new_node);
-
-                    self.maze.at_mut(pos).visit(facing, new_index);
-                }
+                let new_index = self.nodes.len();
+                let new_node = MoveNode {
+                    pos: new_pos,
+                    facing,
+                    points: points + 1,
+                    last: vec![cur_index],
+                };
+                self.unvisited.push(new_index);
+                self.nodes.push(new_node);
             }
         }
 
