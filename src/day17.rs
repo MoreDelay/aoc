@@ -94,8 +94,24 @@ impl Instruction {
             _ => false,
         }
     }
+
+    fn as_opcode(self) -> [u8; 2] {
+        use Instruction::*;
+        match self {
+            Adv(op) => [0, op],
+            Bxl(op) => [1, op],
+            Bst(op) => [2, op],
+            Jnz(op) => [3, op],
+            Bxc(op) => [4, op],
+            Out(op) => [5, op],
+            Bdv(op) => [6, op],
+            Cdv(op) => [7, op],
+            Halt => panic!("Halt has no opcode"),
+        }
+    }
 }
 
+#[derive(Clone)]
 struct Computer {
     registers: Registers,
     instruction_pointer: usize,
@@ -264,8 +280,14 @@ impl Computer {
                 let den = 2usize.pow(val as u32);
                 self.registers.reg_c = num / den;
             }
-            Halt => todo!(),
+            Halt => (),
         }
+    }
+
+    fn reset(&mut self, registers: Registers) {
+        self.instruction_pointer = 0;
+        self.output.truncate(0);
+        self.registers = registers;
     }
 
     fn run(&mut self) -> &Vec<u8> {
@@ -274,6 +296,7 @@ impl Computer {
         while !next.halt() {
             assert!(count < 1_000_000);
             count += 1;
+            // println!("count: {count}, next: {next}\nstate: {:?}", self.registers);
             self.do_instruction(next);
             next = self.next_instruction();
         }
@@ -291,6 +314,67 @@ fn accumulate_string(values: &[u8]) -> String {
     })
 }
 
+#[derive(Debug)]
+struct DFSNode {
+    step: usize,
+    next: usize,
+    reg_a: usize,
+}
+
+fn find_needed_register_value(mut computer: Computer, expected: &[u8]) -> usize {
+    let initial = DFSNode {
+        step: 0,
+        next: 0,
+        reg_a: 0,
+    };
+    let mut stack = vec![initial];
+
+    while let Some(node) = stack.pop() {
+        let DFSNode { step, next, reg_a } = node;
+
+        if step == expected.len() {
+            // found reg
+            return reg_a;
+        }
+
+        assert!(stack.len() < expected.len());
+        assert!(step <= expected.len());
+        assert!(next <= 7);
+
+        let new_reg = (reg_a << 3) + next;
+        let mut registers = Registers::default();
+        registers.reg_a = new_reg;
+        computer.reset(registers);
+
+        let next_produced = computer.run().first();
+
+        let can_try_next_val = next < 7;
+        if can_try_next_val {
+            // try next value, either immediately or when next step fails
+            let cur_node = DFSNode {
+                step,
+                next: next + 1,
+                reg_a,
+            };
+            stack.push(cur_node);
+        }
+
+        let next_expected = expected[expected.len() - 1 - step];
+        let correct_output = next_produced.is_some_and(|&out| out == next_expected);
+        if correct_output {
+            // go to next step
+            let for_next_step = DFSNode {
+                step: step + 1,
+                next: 0,
+                reg_a: new_reg,
+            };
+            stack.push(for_next_step);
+        }
+    }
+
+    panic!("nothing works");
+}
+
 pub fn run() -> Result<()> {
     println!("day 17");
     let path = PathBuf::from("./resources/day17.txt");
@@ -299,6 +383,14 @@ pub fn run() -> Result<()> {
     let values = computer.run();
     let output = accumulate_string(values);
     println!("computer outputs: {output}");
+
+    let expected_output = computer
+        .program
+        .iter()
+        .flat_map(|i| i.as_opcode())
+        .collect::<Vec<u8>>();
+    let needed_reg = find_needed_register_value(computer, &expected_output);
+    println!("to get identity program use: {needed_reg}");
     Ok(())
 }
 
@@ -317,5 +409,22 @@ Program: 0,1,5,4,3,0";
         let values = computer.run();
         let output = accumulate_string(values);
         assert_eq!(output, "4,6,3,5,6,3,5,2,1,0");
+    }
+
+    #[test]
+    fn test_find_register_value() {
+        let input = "Register A: 2024
+Register B: 0
+Register C: 0
+
+Program: 0,3,5,4,3,0";
+        let computer = Computer::parse(input).unwrap();
+        let expected_output = computer
+            .program
+            .iter()
+            .flat_map(|i| i.as_opcode())
+            .collect::<Vec<u8>>();
+        let reg = find_needed_register_value(computer, &expected_output);
+        assert_eq!(reg, 117440);
     }
 }
