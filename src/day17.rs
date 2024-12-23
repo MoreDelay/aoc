@@ -89,10 +89,7 @@ impl Display for Instruction {
 
 impl Instruction {
     fn halt(self) -> bool {
-        match self {
-            Instruction::Halt => true,
-            _ => false,
-        }
+        matches!(self, Instruction::Halt)
     }
 
     fn as_opcode(self) -> [u8; 2] {
@@ -111,7 +108,7 @@ impl Instruction {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct Computer {
     registers: Registers,
     instruction_pointer: usize,
@@ -125,7 +122,7 @@ impl Display for Computer {
         f.write_str(&format!("counter: {}\n", self.instruction_pointer))?;
         self.registers.fmt(f)?;
         f.write_str("\n")?;
-        if let Some(v) = self.program.get(0) {
+        if let Some(v) = self.program.first() {
             v.fmt(f)?;
         }
         for v in self.program.iter().skip(1) {
@@ -133,17 +130,6 @@ impl Display for Computer {
             v.fmt(f)?;
         }
         Ok(())
-    }
-}
-
-impl Default for Computer {
-    fn default() -> Self {
-        Computer {
-            registers: Registers::default(),
-            instruction_pointer: 0,
-            program: Vec::new(),
-            output: Vec::new(),
-        }
     }
 }
 
@@ -318,32 +304,34 @@ fn accumulate_string(values: &[u8]) -> String {
 struct DFSNode {
     step: usize,
     next: usize,
-    reg_a: usize,
+    reg: usize,
 }
 
 fn find_needed_register_value(mut computer: Computer, expected: &[u8]) -> usize {
     let initial = DFSNode {
         step: 0,
         next: 0,
-        reg_a: 0,
+        reg: 0,
     };
     let mut stack = vec![initial];
 
     while let Some(node) = stack.pop() {
-        let DFSNode { step, next, reg_a } = node;
+        let DFSNode { step, next, reg } = node;
 
         if step == expected.len() {
             // found reg
-            return reg_a;
+            return reg;
         }
 
         assert!(stack.len() < expected.len());
         assert!(step <= expected.len());
         assert!(next <= 7);
 
-        let new_reg = (reg_a << 3) + next;
-        let mut registers = Registers::default();
-        registers.reg_a = new_reg;
+        let cur_reg = (reg << 3) + next;
+        let registers = Registers {
+            reg_a: cur_reg,
+            ..Default::default()
+        };
         computer.reset(registers);
 
         let next_produced = computer.run().first();
@@ -354,7 +342,7 @@ fn find_needed_register_value(mut computer: Computer, expected: &[u8]) -> usize 
             let cur_node = DFSNode {
                 step,
                 next: next + 1,
-                reg_a,
+                reg,
             };
             stack.push(cur_node);
         }
@@ -366,7 +354,7 @@ fn find_needed_register_value(mut computer: Computer, expected: &[u8]) -> usize 
             let for_next_step = DFSNode {
                 step: step + 1,
                 next: 0,
-                reg_a: new_reg,
+                reg: cur_reg,
             };
             stack.push(for_next_step);
         }

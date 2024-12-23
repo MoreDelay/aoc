@@ -63,13 +63,13 @@ impl Eq for Tile {}
 
 impl PartialEq for Tile {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Tile::Empty(..), Tile::Empty(..)) => true,
-            (Tile::Wall, Tile::Wall) => true,
-            (Tile::Start(..), Tile::Start(..)) => true,
-            (Tile::End(..), Tile::End(..)) => true,
-            _ => false,
-        }
+        matches!(
+            (self, other),
+            (Tile::Empty(..), Tile::Empty(..))
+                | (Tile::Wall, Tile::Wall)
+                | (Tile::Start(..), Tile::Start(..))
+                | (Tile::End(..), Tile::End(..))
+        )
     }
 }
 
