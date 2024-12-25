@@ -74,14 +74,14 @@ pub fn run() -> Result<()> {
                     .all(|&[a, b]| decreasing(a, b) && gradual(a, b))
         })
         .count();
-    println!("valid={valid_records}");
+    println!("valid records: {valid_records}");
 
     let dampened_records: Vec<_> = data
         .iter()
         .filter(|&row| validate_record_dampened(row, 1))
         .collect();
     let dampened_valid = dampened_records.len();
-    println!("dampened={dampened_valid}");
+    println!("valid dampened records: {dampened_valid}");
 
     Ok(())
 }

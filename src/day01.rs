@@ -14,7 +14,7 @@ pub fn run() -> Result<()> {
     let distance: usize = zip(&mut *left, &mut *right)
         .map(|(a, b)| a.abs_diff(*b))
         .sum();
-    println!("distance={distance}");
+    println!("distance: {distance}");
 
     let mut right_freq = HashMap::new();
     for val in right.iter() {
@@ -24,6 +24,6 @@ pub fn run() -> Result<()> {
         .iter()
         .map(|val| val * *right_freq.entry(val).or_default())
         .sum();
-    println!("similarity={similarity}");
+    println!("similarity: {similarity}");
     Ok(())
 }

@@ -82,15 +82,8 @@ fn parse_stripes(input: &str) -> Result<(Vec<Towel>, Vec<Pattern>)> {
     Ok((towels, patterns))
 }
 
-fn make_patterns_with_towels(patterns: &[Pattern], towels: &[Towel]) -> usize {
-    patterns
-        .iter()
-        .filter(|p| p.can_combine(towels) > 0)
-        .count()
-}
-
-fn count_possible_arrangements(patterns: &[Pattern], towels: &[Towel]) -> usize {
-    patterns.iter().map(|p| p.can_combine(towels)).sum()
+fn count_options(patterns: &[Pattern], towels: &[Towel]) -> Vec<usize> {
+    patterns.iter().map(|p| p.can_combine(&towels)).collect()
 }
 
 pub fn run() -> Result<()> {
@@ -98,9 +91,11 @@ pub fn run() -> Result<()> {
     let path = PathBuf::from("./resources/day19.txt");
     let data = util::get_data_string(&path)?;
     let (towels, patterns) = parse_stripes(&data).unwrap();
-    let possible = make_patterns_with_towels(&patterns, &towels);
+    let options = count_options(&patterns, &towels);
+    let possible = options.iter().filter(|&&v| v > 0).count();
     println!("can create {possible} patterns");
-    let arrangements = count_possible_arrangements(&patterns, &towels);
+
+    let arrangements: usize = options.iter().sum();
     println!("we have {arrangements} options to create patterns");
     Ok(())
 }
@@ -122,7 +117,8 @@ bwurrg
 brgr
 bbrgwb";
         let (towels, patterns) = parse_stripes(input).unwrap();
-        let possible = make_patterns_with_towels(&patterns, &towels);
+        let options = count_options(&patterns, &towels);
+        let possible = options.iter().filter(|&&v| v > 0).count();
         assert_eq!(possible, 6);
     }
 
@@ -139,7 +135,8 @@ bwurrg
 brgr
 bbrgwb";
         let (towels, patterns) = parse_stripes(input).unwrap();
-        let arrangements = count_possible_arrangements(&patterns, &towels);
+        let options = count_options(&patterns, &towels);
+        let arrangements: usize = options.iter().sum();
         assert_eq!(arrangements, 16);
     }
 }

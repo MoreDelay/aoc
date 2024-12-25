@@ -85,7 +85,7 @@ pub fn run() -> Result<()> {
         .map(|&Mul(a, b)| a * b)
         .reduce(|a, b| a + b)
         .unwrap_or(0);
-    println!("result={result}");
+    println!("sum of mul's: {result}");
 
     let cond_muls = parse_mul_conditional(&data);
 
@@ -94,7 +94,7 @@ pub fn run() -> Result<()> {
         .map(|&Mul(a, b)| a * b)
         .reduce(|a, b| a + b)
         .unwrap_or(0);
-    println!("cond_result={cond_result}");
+    println!("mul's respecting conditions: {cond_result}");
 
     Ok(())
 }

@@ -288,11 +288,11 @@ pub fn run() -> Result<()> {
     let (mut warehouse, moves) = parse_small_warehouse(&data)?;
     warehouse.execute_protocol(&moves);
     let gps_sum = warehouse.compute_gps_sum();
-    println!("GPS sum: {gps_sum}");
+    println!("GPS sum small warehouse: {gps_sum}");
     let (mut warehouse, moves) = parse_big_warehouse(&data)?;
     warehouse.execute_protocol(&moves);
     let gps_sum = warehouse.compute_gps_sum();
-    println!("GPS sum: {gps_sum}");
+    println!("GPS sum big warehouse: {gps_sum}");
     Ok(())
 }
 

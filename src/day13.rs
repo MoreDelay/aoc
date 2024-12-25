@@ -288,10 +288,10 @@ pub fn run() -> Result<()> {
     let machines = parse_machines(&data)?;
     // let (tokens, prizes) = find_optimal_cost_dijkstra(&machines);
     let (tokens, prizes) = find_optimal_cost_equation(&machines);
-    println!("need {tokens} to win {prizes} prizes");
+    println!("need {tokens} tokens to win {prizes} prizes");
     let machines = correct_machines(machines);
     let (tokens, prizes) = find_optimal_cost_equation(&machines);
-    println!("after correction, need {tokens} to win {prizes} prizes");
+    println!("after correction, need {tokens} tokens to win {prizes} prizes");
     Ok(())
 }
 
