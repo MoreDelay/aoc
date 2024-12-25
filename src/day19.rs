@@ -83,7 +83,7 @@ fn parse_stripes(input: &str) -> Result<(Vec<Towel>, Vec<Pattern>)> {
 }
 
 fn count_options(patterns: &[Pattern], towels: &[Towel]) -> Vec<usize> {
-    patterns.iter().map(|p| p.can_combine(&towels)).collect()
+    patterns.iter().map(|p| p.can_combine(towels)).collect()
 }
 
 pub fn run() -> Result<()> {
