@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::{collections::VecDeque, path::PathBuf};
+use std::{collections::VecDeque, ops::RangeInclusive, path::PathBuf};
 
 use crate::util::{self, AocError};
 
@@ -143,22 +143,34 @@ impl RaceTrack {
         }
     }
 
-    fn iter(&self) -> TrackIter {
-        TrackIter {
-            track: self,
-            pos: Some(self.start),
-            dist: 0,
-        }
+    fn iter_pos(&self) -> TrackPosIter {
+        TrackPosIter::new(self)
+    }
+
+    fn iter_circle(&self, origin: Pos, radius: usize) -> CircleIter {
+        CircleIter::new(self.size, origin, radius)
+    }
+
+    fn iter_cheats(&self, length: usize) -> CheatsIter {
+        CheatsIter::new(self, length)
     }
 }
 
-struct TrackIter<'a> {
+struct TrackPosIter<'a> {
     track: &'a RaceTrack,
     pos: Option<Pos>,
     dist: usize,
 }
 
-impl Iterator for TrackIter<'_> {
+impl<'a> TrackPosIter<'a> {
+    fn new(track: &'a RaceTrack) -> Self {
+        let pos = Some(track.start);
+        let dist = 0;
+        TrackPosIter { track, pos, dist }
+    }
+}
+
+impl Iterator for TrackPosIter<'_> {
     type Item = Pos;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -181,11 +193,82 @@ impl Iterator for TrackIter<'_> {
             () if y > 0 && is_next(Pos(x, y - 1)) => Pos(x, y - 1),
             () if x < width - 1 && is_next(Pos(x + 1, y)) => Pos(x + 1, y),
             () if y < height - 1 && is_next(Pos(x, y + 1)) => Pos(x, y + 1),
-            _ => return out,
+            _ => {
+                let end = self.track.at(Pos(x, y));
+                assert!(matches!(end, Tile::End(_)));
+                return out;
+            }
         };
         self.pos = Some(next_pos);
         self.dist += 1;
         out
+    }
+}
+
+struct CircleIter {
+    size: Pos,
+    origin: Pos,
+    radius: isize,
+    delta_y: isize,
+    did_left: bool,
+}
+
+impl CircleIter {
+    fn new(size: Pos, origin: Pos, radius: usize) -> CircleIter {
+        let radius = radius as isize;
+        let delta_y = -radius;
+        let did_left = false;
+        CircleIter {
+            size,
+            origin,
+            radius,
+            delta_y,
+            did_left,
+        }
+    }
+}
+
+impl Iterator for CircleIter {
+    type Item = Pos;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let &mut CircleIter {
+            size: Pos(width, height),
+            origin: Pos(x_o, y_o),
+            radius,
+            ..
+        } = self;
+        while self.delta_y <= radius {
+            let delta_y = self.delta_y;
+            let pos_per_side = radius - self.delta_y.abs();
+            // set state for next iteration
+            let delta_x = if pos_per_side > 0 && !self.did_left {
+                self.did_left = true;
+                -pos_per_side
+            } else {
+                self.delta_y += 1;
+                self.did_left = false;
+                pos_per_side
+            };
+            let out_of_bounds = delta_y < 0 && (-delta_y) as usize > y_o
+                || delta_x < 0 && (-delta_x) as usize > x_o
+                || delta_y >= 0 && y_o + delta_y as usize >= height
+                || delta_x >= 0 && x_o + delta_x as usize >= width;
+            if out_of_bounds {
+                continue;
+            }
+            let out_x = match delta_x >= 0 {
+                true => x_o + delta_x as usize,
+                false => x_o - (-delta_x) as usize,
+            };
+            let out_y = match delta_y >= 0 {
+                true => y_o + delta_y as usize,
+                false => y_o - (-delta_y) as usize,
+            };
+
+            return Some(Pos(out_x, out_y));
+        }
+        None
     }
 }
 
@@ -196,67 +279,110 @@ struct Cheat {
     saving: usize,
 }
 
-fn find_all_cheats(track: &RaceTrack) -> Vec<Cheat> {
-    let Pos(width, height) = track.size;
-    let mut cheats = Vec::new();
+struct CheatsIter<'a> {
+    track: &'a RaceTrack,
+    length: usize,
+    last_pos: Option<Pos>,
+    last_radius: Option<usize>,
+    track_iter: TrackPosIter<'a>,
+    radius_iter: RangeInclusive<usize>,
+    circle_iter: CircleIter,
+}
 
-    for start in track.iter() {
-        let Pos(x, y) = start;
-        let at_start = match track.at(start) {
+impl<'a> CheatsIter<'a> {
+    fn new(track: &'a RaceTrack, length: usize) -> Self {
+        assert!(length > 0);
+        let mut track_iter = track.iter_pos();
+        let last_pos = track_iter.next();
+
+        let mut radius_iter = 1..=length;
+        let last_radius = radius_iter.next();
+
+        let circle_iter = track.iter_circle(
+            last_pos.expect("track has start"),
+            last_radius.expect("length >= 1"),
+        );
+
+        CheatsIter {
+            track,
+            length,
+            last_pos,
+            last_radius,
+            track_iter,
+            radius_iter,
+            circle_iter,
+        }
+    }
+
+    fn make_cheat(&self, end: Pos) -> Option<Cheat> {
+        let start = self.last_pos.expect("called during valid iteration");
+        let radius = self.last_radius.expect("called during valid iteration");
+
+        let at_start = match self.track.at(start) {
             Tile::Empty(d) => d,
             Tile::Start => 0,
             Tile::End(d) => d,
             Tile::Wall => unreachable!(),
         };
-        let make_cheat = |end| {
-            let at_end = match track.at(end) {
-                Tile::Empty(d) => d,
-                Tile::Start => return None,
-                Tile::End(d) => d,
-                Tile::Wall => return None,
-            };
-            if at_start >= at_end {
-                return None;
-            }
-            let saving = at_end - at_start - 2;
-            if saving == 0 {
-                return None;
-            }
-            Some(Cheat { start, end, saving })
+
+        let at_end = match self.track.at(end) {
+            Tile::Empty(d) => d,
+            Tile::Start => return None,
+            Tile::End(d) => d,
+            Tile::Wall => return None,
         };
-        if x > 1 {
-            let end = Pos(x - 2, y);
-            if let Some(cheat) = make_cheat(end) {
-                cheats.push(cheat);
-            }
+        if at_start + radius >= at_end {
+            return None;
         }
-        if y > 1 {
-            let end = Pos(x, y - 2);
-            if let Some(cheat) = make_cheat(end) {
-                cheats.push(cheat);
-            }
-        }
-        if x < width - 2 {
-            let end = Pos(x + 2, y);
-            if let Some(cheat) = make_cheat(end) {
-                cheats.push(cheat);
-            }
-        }
-        if y < height - 2 {
-            let end = Pos(x, y + 2);
-            if let Some(cheat) = make_cheat(end) {
-                cheats.push(cheat);
-            }
+        let saving = at_end - at_start - radius;
+        Some(Cheat { start, end, saving })
+    }
+
+    fn update_radius(&mut self) {
+        let Some(start) = self.last_pos else {
+            self.last_radius = None;
+            return;
+        };
+        self.last_radius = self.radius_iter.next();
+        if let Some(radius) = self.last_radius {
+            self.circle_iter = self.track.iter_circle(start, radius);
         }
     }
 
-    cheats
+    fn update_pos(&mut self) {
+        self.last_pos = self.track_iter.next();
+        if self.last_pos.is_some() {
+            self.radius_iter = 1..=self.length;
+        }
+    }
 }
 
-fn count_good_cheats(cheats: &[Cheat], lower_bound: usize) -> usize {
+impl Iterator for CheatsIter<'_> {
+    type Item = Cheat;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.last_pos.is_some() {
+            while self.last_radius.is_some() {
+                while let Some(end) = self.circle_iter.next() {
+                    if let Some(cheat) = self.make_cheat(end) {
+                        return Some(cheat);
+                    }
+                }
+                self.update_radius();
+            }
+            self.update_pos();
+            self.update_radius();
+        }
+        None
+    }
+}
+
+fn count_good_cheats<T>(cheats: T, lower_bound: usize) -> usize
+where
+    T: Iterator<Item = Cheat>,
+{
     cheats
-        .iter()
-        .filter(|&&Cheat { saving, .. }| saving >= lower_bound)
+        .filter(|&Cheat { saving, .. }| saving >= lower_bound)
         .count()
 }
 
@@ -265,9 +391,12 @@ pub fn run() -> Result<()> {
     let path = PathBuf::from("./resources/day20.txt");
     let data = util::get_data_string(&path)?;
     let track = RaceTrack::parse(&data)?;
-    let cheats = find_all_cheats(&track);
-    let good_cheats = count_good_cheats(&cheats, 100);
-    println!("good cheating spots: {good_cheats}");
+    let cheat_iter = track.iter_cheats(2);
+    let good_cheats = count_good_cheats(cheat_iter, 100);
+    println!("good 2 picosecond cheating spots: {good_cheats}");
+    let cheat_iter = track.iter_cheats(20);
+    let good_cheats = count_good_cheats(cheat_iter, 100);
+    println!("good 20 picosecond cheating spots: {good_cheats}");
     Ok(())
 }
 
@@ -276,7 +405,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_example_patterns() {
+    fn test_small_cheats() {
         let input = "###############
 #...#...#.....#
 #.#.#.#.#.###.#
@@ -293,16 +422,15 @@ mod tests {
 #...#...#...###
 ###############";
         let track = RaceTrack::parse(input).unwrap();
-        let cheats = find_all_cheats(&track);
 
         let with_saving = |expected| {
-            cheats
-                .iter()
-                .filter(|&&Cheat { saving, .. }| saving == expected)
+            track
+                .iter_cheats(2)
+                .filter(|&Cheat { saving, .. }| saving == expected)
                 .count()
         };
 
-        assert_eq!(cheats.len(), 44);
+        assert_eq!(track.iter_cheats(2).count(), 44);
         assert_eq!(with_saving(2), 14);
         assert_eq!(with_saving(4), 14);
         assert_eq!(with_saving(6), 2);
@@ -314,5 +442,67 @@ mod tests {
         assert_eq!(with_saving(38), 1);
         assert_eq!(with_saving(40), 1);
         assert_eq!(with_saving(64), 1);
+    }
+
+    #[test]
+    fn test_large_cheats() {
+        let input = "###############
+#...#...#.....#
+#.#.#.#.#.###.#
+#S#...#.#.#...#
+#######.#.#.###
+#######.#.#...#
+#######.#.###.#
+###..E#...#...#
+###.#######.###
+#...###...#...#
+#.#####.#.###.#
+#.#...#.#.#...#
+#.#.#.#.#.#.###
+#...#...#...###
+###############";
+        let track = RaceTrack::parse(input).unwrap();
+        let with_saving = |expected| {
+            track
+                .iter_cheats(20)
+                .filter(|&Cheat { saving, .. }| saving == expected)
+                .count()
+        };
+
+        assert_eq!(with_saving(50), 32);
+        assert_eq!(with_saving(52), 31);
+        assert_eq!(with_saving(54), 29);
+        assert_eq!(with_saving(56), 39);
+        assert_eq!(with_saving(58), 25);
+        assert_eq!(with_saving(60), 23);
+        assert_eq!(with_saving(62), 20);
+        assert_eq!(with_saving(64), 19);
+        assert_eq!(with_saving(66), 12);
+        assert_eq!(with_saving(68), 14);
+        assert_eq!(with_saving(70), 12);
+        assert_eq!(with_saving(72), 22);
+        assert_eq!(with_saving(74), 4);
+        assert_eq!(with_saving(76), 3);
+    }
+
+    #[test]
+    fn test_circle_iter() {
+        let size = Pos(21, 21);
+        let origin = Pos(10, 10);
+        let radius = 3;
+        let mut iter = CircleIter::new(size, origin, radius);
+        assert_eq!(iter.next(), Some(Pos(10, 7)));
+        assert_eq!(iter.next(), Some(Pos(9, 8)));
+        assert_eq!(iter.next(), Some(Pos(11, 8)));
+        assert_eq!(iter.next(), Some(Pos(8, 9)));
+        assert_eq!(iter.next(), Some(Pos(12, 9)));
+        assert_eq!(iter.next(), Some(Pos(7, 10)));
+        assert_eq!(iter.next(), Some(Pos(13, 10)));
+        assert_eq!(iter.next(), Some(Pos(8, 11)));
+        assert_eq!(iter.next(), Some(Pos(12, 11)));
+        assert_eq!(iter.next(), Some(Pos(9, 12)));
+        assert_eq!(iter.next(), Some(Pos(11, 12)));
+        assert_eq!(iter.next(), Some(Pos(10, 13)));
+        assert_eq!(iter.next(), None);
     }
 }
