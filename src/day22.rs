@@ -1,9 +1,5 @@
 use anyhow::Result;
-use std::{
-    cmp::Ordering,
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-};
+use std::{cmp::Ordering, path::PathBuf};
 
 use crate::util::{self, AocError};
 
@@ -80,11 +76,11 @@ impl ChangeSequence {
         self.storage.push(value);
     }
 
-    fn get(&self) -> Option<Vec<isize>> {
+    fn get(&self) -> Option<&[isize]> {
         if self.storage.len() != self.size {
             None
         } else {
-            Some(self.storage.clone())
+            Some(&self.storage)
         }
     }
 }
@@ -101,9 +97,22 @@ fn find_best_banana_bargain(secrets: &[Secret], seq_size: usize, changes: usize)
         return 0;
     }
 
-    let mut map = HashMap::new();
+    const CHANGE_RANGE: usize = 9 + 1 + 9;
+    let unique_seqs = CHANGE_RANGE.pow(seq_size as u32);
+
+    let make_key = |key: &[isize]| -> usize {
+        key.iter().fold(0, |acc, v| {
+            assert!(v.abs() < 10);
+            acc * CHANGE_RANGE + ((v + 9) as usize)
+        })
+    };
+
+    // save potential result for all sequences
+    // use long vecs instead of hash map because hashing takes a long time
+    // not viable for longer sequences
+    let mut map = vec![0; unique_seqs];
     for secret in secrets {
-        let mut set = HashSet::new(); // only first occurrence of sequence counts
+        let mut set = vec![false; unique_seqs]; // only first occurrence of sequence counts
         let mut change_sequence = ChangeSequence::new(seq_size);
         let mut prev = *secret;
         let mut cur = secret.evolve();
@@ -115,10 +124,11 @@ fn find_best_banana_bargain(secrets: &[Secret], seq_size: usize, changes: usize)
             change_sequence.push(change);
 
             if let Some(key) = change_sequence.get() {
-                if set.insert(key.clone()) {
-                    let price = cur_price;
-                    let overall_profit = map.entry(key).or_insert(0);
-                    *overall_profit += price;
+                let key = make_key(key);
+
+                if !set[key] {
+                    set[key] = true;
+                    map[key] += cur_price;
                 }
             }
 
@@ -127,7 +137,7 @@ fn find_best_banana_bargain(secrets: &[Secret], seq_size: usize, changes: usize)
         }
     }
 
-    *map.values()
+    *map.iter()
         .max()
         .expect("has valid sequence because seq_size <= changes")
 }
