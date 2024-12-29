@@ -80,36 +80,44 @@ impl ChangeSequence {
         self.storage.push(value);
     }
 
-    fn get(&self) -> Option<[isize; 4]> {
+    fn get(&self) -> Option<Vec<isize>> {
         if self.storage.len() != self.size {
             None
         } else {
-            Some(self.storage.clone().try_into().expect("always size 4"))
+            Some(self.storage.clone())
         }
     }
 }
 
+fn get_change(before: usize, after: usize) -> isize {
+    match before.cmp(&after) {
+        Ordering::Less => -(before.abs_diff(after) as isize),
+        Ordering::Equal | Ordering::Greater => before.abs_diff(after) as isize,
+    }
+}
+
 fn find_best_banana_bargain(secrets: &[Secret], seq_size: usize, changes: usize) -> usize {
+    if seq_size > changes {
+        return 0;
+    }
+
     let mut map = HashMap::new();
     for secret in secrets {
-        let mut set = HashSet::new();
-        let mut sequence = ChangeSequence::new(seq_size);
+        let mut set = HashSet::new(); // only first occurrence of sequence counts
+        let mut change_sequence = ChangeSequence::new(seq_size);
         let mut prev = *secret;
         let mut cur = secret.evolve();
-        for _ in 0..changes {
-            let prev_val = prev.make_banana_price();
-            let cur_val = cur.make_banana_price();
-            let change = match prev_val.cmp(&cur_val) {
-                Ordering::Less => -(prev_val.abs_diff(cur_val) as isize),
-                Ordering::Equal | Ordering::Greater => prev_val.abs_diff(cur_val) as isize,
-            };
-            sequence.push(change);
 
-            if let Some(seq) = sequence.get() {
-                if !set.contains(&seq) {
-                    set.insert(seq);
-                    let price = cur.make_banana_price();
-                    let overall_profit = map.entry(seq).or_insert(0);
+        for _ in 0..changes {
+            let prev_price = prev.make_banana_price();
+            let cur_price = cur.make_banana_price();
+            let change = get_change(prev_price, cur_price);
+            change_sequence.push(change);
+
+            if let Some(key) = change_sequence.get() {
+                if set.insert(key.clone()) {
+                    let price = cur_price;
+                    let overall_profit = map.entry(key).or_insert(0);
                     *overall_profit += price;
                 }
             }
@@ -119,7 +127,9 @@ fn find_best_banana_bargain(secrets: &[Secret], seq_size: usize, changes: usize)
         }
     }
 
-    *map.values().max().expect("any sequence valid")
+    *map.values()
+        .max()
+        .expect("has valid sequence because seq_size <= changes")
 }
 
 pub fn run() -> Result<()> {
