@@ -101,11 +101,13 @@ fn expand_cache(stone: Stone, count: usize, cache: &mut Cache) {
 
         // check if we know the answer to our splits
         // if not, then we push to stack and continue
-        let (split1, split2) = match stone.blink()[..] {
-            [s] => (Some(s), None),
-            [s1, s2] => (Some(s1), Some(s2)),
+        let splits = match stone.blink()[..] {
+            [s] => [Some(s), None],
+            [s1, s2] => [Some(s1), Some(s2)],
             _ => panic!("blink should only ever return 1 or 2 stones"),
         };
+        let [split1, split2] = splits;
+
         if let Some(split1) = split1 {
             let key = (split1.0, blinks_left - 1);
             if let Entry::Vacant(_) = cache.entry(key) {
@@ -131,7 +133,7 @@ fn expand_cache(stone: Stone, count: usize, cache: &mut Cache) {
 
         // when we get here, we have confirmed that all values are already in cache
         // so we can insert a new cache entry
-        let total_splits: usize = [split1, split2]
+        let total_splits: usize = splits
             .iter()
             .map(|s| {
                 s.map(|s| {
@@ -148,7 +150,7 @@ fn expand_cache(stone: Stone, count: usize, cache: &mut Cache) {
 }
 
 fn do_blinks_cached(stones: &Vec<Stone>, count: usize) -> usize {
-    let mut cache: HashMap<(usize, usize), usize> = HashMap::new(); // map (value, blinks) -> n_stones
+    let mut cache: Cache = HashMap::new(); // map (value, blinks) -> n_stones
     for &stone in stones {
         expand_cache(stone, count, &mut cache);
     }
