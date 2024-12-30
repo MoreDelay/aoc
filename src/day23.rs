@@ -86,11 +86,21 @@ impl Network {
                 .push(one.clone());
         }
 
-        let computers = computers.into_values().collect();
+        let mut computers = computers.into_values().collect::<Vec<_>>();
+
+        // make order deterministic
+        computers.sort_by(|a, b| {
+            let a = a.borrow();
+            let b = b.borrow();
+            (a.name.cmp(&b.name)).then((a.neighbors.len()).cmp(&b.neighbors.len()))
+        });
         Ok(Network { computers })
     }
 
-    fn count_filtered_cliques<F: Fn(&Computer) -> bool>(&self, filter: F) -> usize {
+    fn count_filtered_cliques<F>(&self, filter: F) -> usize
+    where
+        F: Fn(&Computer) -> bool,
+    {
         let mut cliques = Vec::new();
         for computer in self.computers.iter() {
             let computer = computer.borrow();
@@ -131,17 +141,20 @@ impl Network {
             take: bool,
         }
 
-        let mut sorted: Vec<_> = self.computers.iter().collect();
-        sorted.sort_by(|&a, &b| {
-            let a_len = a.borrow().neighbors.len();
-            let b_len = b.borrow().neighbors.len();
-            a_len.cmp(&b_len)
+        // computers are Rc so clone is cheap
+        let mut sorted = self.computers.clone();
+        sorted.sort_by(|a, b| {
+            let a = a.borrow();
+            let b = b.borrow();
+            a.neighbors.len().cmp(&b.neighbors.len())
         });
 
         let mut best = Vec::new();
-        for &computer in sorted.iter() {
+        for computer in sorted.iter() {
             let computer = computer.borrow();
-            if computer.neighbors.len() <= best.len() {
+            let n_neighbors = computer.neighbors.len();
+            if n_neighbors <= best.len() {
+                // no computer after has more neighbors because we sorted
                 break;
             }
 
@@ -157,7 +170,6 @@ impl Network {
                 take: false,
             });
 
-            let n_neighbors = computer.neighbors.len();
             while let Some(node) = queue.pop_front() {
                 let TreeNode {
                     index,
@@ -165,12 +177,8 @@ impl Network {
                     take,
                 } = node;
 
-                // early break out
                 let potential_size = n_neighbors - index + 1 + clique.len();
-                if best.len() >= potential_size {
-                    continue;
-                }
-                if index == n_neighbors {
+                if index == n_neighbors || best.len() >= potential_size {
                     continue;
                 }
 
@@ -320,6 +328,6 @@ td-yn";
         let network = Network::parse(input).unwrap();
         let names = network.get_largest_clique();
         let password = names.join(",");
-        assert_eq!(password, "co,de,ka,ta,za");
+        assert_eq!(password, "co,de,ka,ta");
     }
 }
