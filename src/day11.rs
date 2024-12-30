@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::{
     collections::{hash_map::Entry, HashMap},
+    ops::ControlFlow,
     path::PathBuf,
 };
 
@@ -100,49 +101,27 @@ fn expand_cache(stone: Stone, count: usize, cache: &mut Cache) {
         }
 
         // check if we know the answer to our splits
-        // if not, then we push to stack and continue
-        let splits = match stone.blink()[..] {
-            [s] => [Some(s), None],
-            [s1, s2] => [Some(s1), Some(s2)],
-            _ => panic!("blink should only ever return 1 or 2 stones"),
+        // if not, then we push to stack and get missing answer first
+        let total_splits = stone.blink().into_iter().try_fold(0, |acc, stone| {
+            let key = (stone.0, blinks_left - 1);
+            match cache.entry(key) {
+                Entry::Vacant(_) => ControlFlow::Break(stone),
+                Entry::Occupied(e) => ControlFlow::Continue(acc + *e.get()),
+            }
+        });
+
+        let total_splits = match total_splits {
+            ControlFlow::Break(stone) => {
+                let frame = StackFrame {
+                    stone,
+                    blinks_left: blinks_left - 1,
+                };
+                stack.push(frame);
+                continue;
+            }
+            ControlFlow::Continue(acc) => acc,
         };
-        let [split1, split2] = splits;
 
-        if let Some(split1) = split1 {
-            let key = (split1.0, blinks_left - 1);
-            if let Entry::Vacant(_) = cache.entry(key) {
-                let frame = StackFrame {
-                    stone: split1,
-                    blinks_left: blinks_left - 1,
-                };
-                stack.push(frame);
-                continue;
-            }
-        }
-        if let Some(split2) = split2 {
-            let key = (split2.0, blinks_left - 1);
-            if let Entry::Vacant(_) = cache.entry(key) {
-                let frame = StackFrame {
-                    stone: split2,
-                    blinks_left: blinks_left - 1,
-                };
-                stack.push(frame);
-                continue;
-            }
-        }
-
-        // when we get here, we have confirmed that all values are already in cache
-        // so we can insert a new cache entry
-        let total_splits: usize = splits
-            .iter()
-            .map(|s| {
-                s.map(|s| {
-                    let key = (s.0, blinks_left - 1);
-                    *cache.get(&key).expect("verified that cache entry exists")
-                })
-                .unwrap_or(0)
-            })
-            .sum();
         let key = (stone.0, blinks_left);
         cache.entry(key).insert_entry(total_splits);
         stack.pop();
