@@ -25,9 +25,9 @@ fn parse_locks_and_keys(input: &str) -> Result<(Vec<Lock>, Vec<Key>)> {
 
         let mut heights = [0; 5];
 
-        for x in 0..5 {
-            for y in 1..6 {
-                if map[y][x] == '#' {
+        for (x, row) in map.iter().enumerate() {
+            for c in row.iter() {
+                if *c == '#' {
                     heights[x] += 1;
                 }
             }

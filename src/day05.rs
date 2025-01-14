@@ -45,15 +45,14 @@ fn separate_input(input: &str) -> Result<(Vec<Rule>, Vec<Vec<usize>>)> {
 }
 
 fn all_rules_upheld(left: usize, right: usize, rules: &[Rule]) -> bool {
-    rules.iter().map(|rule| rule.upheld(left, right)).all(|b| b)
+    rules.iter().all(|rule| rule.upheld(left, right))
 }
 
 fn update_upholds_rules(update: &[usize], rules: &[Rule]) -> bool {
     update
         .windows(2)
         .flat_map(<&[usize; 2]>::try_from)
-        .map(|&[left, right]| all_rules_upheld(left, right, rules))
-        .all(|b| b)
+        .all(|&[left, right]| all_rules_upheld(left, right, rules))
 }
 
 fn quick_sort<T, F>(update: &mut [T], sort_criterion: &F)
