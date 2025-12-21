@@ -1,8 +1,5 @@
-[package]
-name = "aoc2024"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-anyhow = "1.0.93"
-thiserror = "2.0.6"
+[workspace]
+members = [
+    "aoc2024",
+    "aoc2025",
+]
