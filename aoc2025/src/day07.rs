@@ -146,6 +146,12 @@ impl TachyonManifold {
     }
 }
 
+impl std::fmt::Display for TachyonManifold {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.grid.fmt(f)
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum Day07Error {
     #[error("could not open file")]

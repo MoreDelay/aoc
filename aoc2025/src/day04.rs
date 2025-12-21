@@ -25,6 +25,15 @@ impl GridElement {
     }
 }
 
+impl std::fmt::Display for GridElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GridElement::Empty => write!(f, "."),
+            GridElement::PaperRoll => write!(f, "@"),
+        }
+    }
+}
+
 struct WarehouseGrid(util::Grid<GridElement>);
 
 impl WarehouseGrid {
@@ -83,6 +92,12 @@ impl WarehouseGrid {
         }
 
         count
+    }
+}
+
+impl std::fmt::Display for WarehouseGrid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
