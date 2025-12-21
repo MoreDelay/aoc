@@ -1,10 +1,12 @@
+use thiserror::Error;
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct Id {
     value: usize,
 }
 
-#[derive(thiserror::Error, Debug)]
-enum IdParseError {
+#[derive(Error, Debug)]
+pub enum IdParseError {
     #[error("expected format '<number>', got {0}")]
     WrongFormat(String),
 }
@@ -55,7 +57,7 @@ struct IdRange {
 }
 
 #[derive(thiserror::Error, Debug)]
-enum IdRangeParseError {
+pub enum IdRangeParseError {
     #[error("expected format '<number>-<number>', got {0}")]
     MissingIdPair(String),
     #[error("one id is wrong")]
@@ -107,7 +109,7 @@ impl Iterator for IdRangeIter {
 struct IdRanges(Vec<IdRange>);
 
 #[derive(thiserror::Error, Debug)]
-enum IdRangesParseError {
+pub enum IdRangesParseError {
     #[error("error while reading")]
     ReadError(#[from] std::io::Error),
     #[error("not uft8")]
@@ -156,7 +158,15 @@ impl IdRanges {
     }
 }
 
-pub fn day02() -> anyhow::Result<()> {
+#[derive(Debug, Error)]
+pub enum Day02Error {
+    #[error("could not open file")]
+    FileError(#[from] std::io::Error),
+    #[error("could not parse input")]
+    ParseError(#[from] IdRangesParseError),
+}
+
+pub fn day02() -> Result<(), Day02Error> {
     let path = std::path::PathBuf::from("resources/day02.txt");
     let file = std::fs::File::open(path)?;
     let reader = std::io::BufReader::new(file);

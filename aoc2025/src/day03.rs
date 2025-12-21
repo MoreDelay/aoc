@@ -1,9 +1,11 @@
+use thiserror::Error;
+
 struct BatteryBank {
     batteries: Vec<u8>,
 }
 
-#[derive(thiserror::Error, Debug)]
-enum BatteryBankParseError {
+#[derive(Error, Debug)]
+pub enum BatteryBankParseError {
     #[error("found non-number in joltage string, got {0}")]
     NonNumberInLine(String),
 }
@@ -64,7 +66,7 @@ impl BatteryBank {
 struct BatteryBanks(Vec<BatteryBank>);
 
 #[derive(thiserror::Error, Debug)]
-enum BatteryBanksParseError {
+pub enum BatteryBanksParseError {
     #[error("error while reading")]
     ReadError(#[from] std::io::Error),
     #[error("wrong format on line {0}")]
@@ -91,7 +93,15 @@ impl BatteryBanks {
     }
 }
 
-pub fn day03() -> anyhow::Result<()> {
+#[derive(Debug, Error)]
+pub enum Day03Error {
+    #[error("could not open file")]
+    FileError(#[from] std::io::Error),
+    #[error("could not parse input")]
+    ParseError(#[from] BatteryBanksParseError),
+}
+
+pub fn day03() -> Result<(), Day03Error> {
     let path = std::path::PathBuf::from("resources/day03.txt");
     let file = std::fs::File::open(path)?;
     let reader = std::io::BufReader::new(file);

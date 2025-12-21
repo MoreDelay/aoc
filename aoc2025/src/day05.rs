@@ -9,7 +9,7 @@ struct FreshRange {
 }
 
 #[derive(Debug, Error)]
-enum FreshRangeParseError {
+pub enum FreshRangeParseError {
     #[error("expected format '<number>-<number>', got {0}")]
     WrongFormat(String),
     #[error("left number must be smaller than right, got {0}-{1}")]
@@ -51,7 +51,7 @@ struct Database {
 }
 
 #[derive(Debug, Error)]
-enum DatabaseParseError {
+pub enum DatabaseParseError {
     #[error("error while reading")]
     ReadError(#[from] std::io::Error),
     #[error("wrong format on line {0}")]
@@ -157,7 +157,15 @@ impl SimplifiedDatabase {
     }
 }
 
-pub fn day05() -> anyhow::Result<()> {
+#[derive(Debug, Error)]
+pub enum Day05Error {
+    #[error("could not open file")]
+    FileError(#[from] std::io::Error),
+    #[error("could not parse input")]
+    ParseError(#[from] DatabaseParseError),
+}
+
+pub fn day05() -> Result<(), Day05Error> {
     let path = std::path::PathBuf::from("resources/day05.txt");
     let file = std::fs::File::open(path)?;
     let reader = std::io::BufReader::new(file);

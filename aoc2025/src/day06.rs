@@ -12,7 +12,7 @@ struct Worksheet {
 }
 
 #[derive(Debug, Error)]
-enum WorksheetParseError {
+pub enum WorksheetParseError {
     #[error("expected even grid of numbers and operators, missing value at row {0}, col {1}")]
     UnevenGrid(usize, usize),
     #[error("expect at least one number and one operator per column, but only got {0} rows")]
@@ -232,7 +232,15 @@ impl Worksheet {
     }
 }
 
-pub fn day06() -> anyhow::Result<()> {
+#[derive(Debug, Error)]
+pub enum Day06Error {
+    #[error("could not open file")]
+    FileError(#[from] std::io::Error),
+    #[error("could not parse input")]
+    ParseError(#[from] WorksheetParseError),
+}
+
+pub fn day06() -> Result<(), Day06Error> {
     let path = std::path::PathBuf::from("resources/day06.txt");
     let file = std::fs::File::open(path)?;
     let mut reader = std::io::BufReader::new(file);

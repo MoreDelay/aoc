@@ -8,7 +8,7 @@ enum GridElement {
 }
 
 #[derive(Debug, Error)]
-enum GridElementParseError {
+pub enum GridElementParseError {
     #[error("unsupported character, expected '.' or '@', got '{0}'")]
     UnknownElement(char),
 }
@@ -30,7 +30,7 @@ struct WarehouseGrid {
 }
 
 #[derive(Debug, Error)]
-enum WarehouseGridParseError {
+pub enum WarehouseGridParseError {
     #[error("error while reading")]
     ReadError(#[from] std::io::Error),
     #[error("wrong format on line {0}")]
@@ -152,7 +152,15 @@ impl WarehouseGrid {
     }
 }
 
-pub fn day04() -> anyhow::Result<()> {
+#[derive(Debug, Error)]
+pub enum Day04Error {
+    #[error("could not open file")]
+    FileError(#[from] std::io::Error),
+    #[error("could not parse input")]
+    ParseError(#[from] WarehouseGridParseError),
+}
+
+pub fn day04() -> Result<(), Day04Error> {
     let path = std::path::PathBuf::from("resources/day04.txt");
     let file = std::fs::File::open(path)?;
     let reader = std::io::BufReader::new(file);

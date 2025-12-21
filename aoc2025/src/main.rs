@@ -5,25 +5,14 @@ mod day04;
 mod day05;
 mod day06;
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     if false {
-        if let Err(e) = day01::day01() {
-            println!("failed day01: {e:?}");
-        }
-        if let Err(e) = day02::day02() {
-            println!("failed day02: {e:?}");
-        }
-        if let Err(e) = day03::day03() {
-            println!("failed day03: {e:?}");
-        }
-        if let Err(e) = day04::day04() {
-            println!("failed day04: {e:?}");
-        }
-        if let Err(e) = day05::day05() {
-            println!("failed day05: {e:?}");
-        }
+        day01::day01()?;
+        day02::day02()?;
+        day03::day03()?;
+        day04::day04()?;
+        day05::day05()?;
     }
-    if let Err(e) = day06::day06() {
-        println!("failed day06: {e:?}");
-    }
+    day06::day06()?;
+    Ok(())
 }

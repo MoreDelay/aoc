@@ -1,11 +1,13 @@
+use thiserror::Error;
+
 #[derive(Debug, Clone, Copy)]
 enum Rotation {
     Left(u32),
     Right(u32),
 }
 
-#[derive(thiserror::Error, Debug)]
-enum RotationParseError {
+#[derive(Error, Debug)]
+pub enum RotationParseError {
     #[error("expect format '(L|R)<number>', got {0}")]
     WrongFormat(String),
 }
@@ -70,7 +72,7 @@ struct Instructions {
 }
 
 #[derive(thiserror::Error, Debug)]
-enum InstructionsParseError {
+pub enum InstructionsParseError {
     #[error("error while reading")]
     ReadError(#[from] std::io::Error),
     #[error("wrong format at line {0}")]
@@ -111,7 +113,15 @@ impl Instructions {
     }
 }
 
-pub fn day01() -> anyhow::Result<()> {
+#[derive(Debug, Error)]
+pub enum Day01Error {
+    #[error("could not open file")]
+    FileError(#[from] std::io::Error),
+    #[error("could not parse input")]
+    ParseError(#[from] InstructionsParseError),
+}
+
+pub fn day01() -> Result<(), Day01Error> {
     let path = std::path::PathBuf::from("resources/day01.txt");
     let file = std::fs::File::open(path)?;
     let reader = std::io::BufReader::new(file);
