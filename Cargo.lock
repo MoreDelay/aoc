@@ -21,6 +21,7 @@ name = "aoc2025"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "either",
  "itertools",
  "thiserror",
 ]

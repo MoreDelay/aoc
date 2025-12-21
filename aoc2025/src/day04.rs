@@ -1,6 +1,8 @@
 use itertools::iproduct;
 use thiserror::Error;
 
+use crate::util::{self, GridParseError};
+
 #[derive(Debug, Clone, Copy)]
 enum GridElement {
     Empty,
@@ -23,97 +25,28 @@ impl GridElement {
     }
 }
 
-struct WarehouseGrid {
-    elements: Vec<GridElement>,
-    width: usize,
-    height: usize,
-}
-
-#[derive(Debug, Error)]
-pub enum WarehouseGridParseError {
-    #[error("error while reading")]
-    ReadError(#[from] std::io::Error),
-    #[error("wrong format on line {0}")]
-    WrongFormat(usize, #[source] GridElementParseError),
-    #[error("input has not any element")]
-    NoDataForGrid,
-    #[error("input is not a regular grid at line {0}")]
-    NotAGrid(usize),
-}
+struct WarehouseGrid(util::Grid<GridElement>);
 
 impl WarehouseGrid {
-    fn parse(input: impl std::io::BufRead) -> Result<Self, WarehouseGridParseError> {
-        let mut elements = Vec::new();
-        let mut width: Option<usize> = None;
-        let mut height = 0;
-
-        for (i, line) in input.lines().enumerate() {
-            let line = line?;
-            if line.is_empty() {
-                continue;
-            }
-
-            match width {
-                Some(width) => {
-                    if width != line.len() {
-                        return Err(WarehouseGridParseError::NotAGrid(i));
-                    }
-                }
-                None => width = Some(line.len()),
-            }
-
-            for c in line.chars() {
-                let element = GridElement::parse(c)
-                    .map_err(|e| WarehouseGridParseError::WrongFormat(i, e))?;
-                elements.push(element);
-            }
-
-            height += 1;
-        }
-
-        if height == 0 || width.is_none() {
-            return Err(WarehouseGridParseError::NoDataForGrid);
-        }
-        let width = width.expect("checked above");
-        assert_eq!(elements.len(), width * height);
-
-        Ok(Self {
-            elements,
-            width,
-            height,
-        })
+    fn parse(
+        input: impl std::io::BufRead,
+    ) -> Result<Self, util::GridParseError<GridElementParseError>> {
+        let parse = |_, _, c| GridElement::parse(c);
+        let grid = util::Grid::parse(input, parse)?;
+        Ok(Self(grid))
     }
 
     fn at(&self, x: isize, y: isize) -> GridElement {
-        let x_in_range = 0 <= x && x < self.width as isize;
-        let y_in_range = 0 <= y && y < self.height as isize;
-        let in_range = x_in_range && y_in_range;
-        if !in_range {
+        if x < 0 || y < 0 {
             return GridElement::Empty;
         }
-
         let x = x as usize;
         let y = y as usize;
-
-        let index = y * self.width + x;
-        self.elements
-            .get(index)
-            .copied()
-            .unwrap_or(GridElement::Empty)
-    }
-
-    fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut GridElement> {
-        let in_range = x < self.width && y < self.height;
-        if !in_range {
-            return None;
-        }
-
-        let index = y * self.width + x;
-        self.elements.get_mut(index)
+        self.0.get(x, y).copied().unwrap_or(GridElement::Empty)
     }
 
     fn iter_freestanding_roll_positions(&self) -> impl Iterator<Item = (usize, usize)> {
-        iproduct!(0..self.width, 0..self.height).filter(|&(x, y)| {
+        iproduct!(0..self.0.width(), 0..self.0.height()).filter(|&(x, y)| {
             let x = x as isize;
             let y = y as isize;
             if matches!(self.at(x, y), GridElement::Empty) {
@@ -139,6 +72,7 @@ impl WarehouseGrid {
 
             for (x, y) in positions {
                 let element = self
+                    .0
                     .get_mut(x, y)
                     .expect("only valid positions are returned");
                 assert!(matches!(*element, GridElement::PaperRoll));
@@ -157,7 +91,7 @@ pub enum Day04Error {
     #[error("could not open file")]
     FileError(#[from] std::io::Error),
     #[error("could not parse input")]
-    ParseError(#[from] WarehouseGridParseError),
+    ParseError(#[from] GridParseError<GridElementParseError>),
 }
 
 pub fn day04() -> Result<(), Day04Error> {
