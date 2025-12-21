@@ -110,36 +110,36 @@ impl<T: GridGraph> Iterator for PathIter<T> {
             let goal_pos = self.goal.get_pos();
             let (in_x, in_y) = at_pos.get_dirs_towards(goal_pos);
 
-            if let Some(dir) = in_x {
-                if let Ok(next_at) = at.go(dir) {
-                    let path_info = RevPathInfo {
-                        dir,
-                        prev_index: info_index,
-                    };
-                    self.infos.push(Some(path_info));
-                    let next_index = self.infos.len() - 1;
-                    let next = DFSNode {
-                        at: next_at,
-                        info_index: next_index,
-                    };
-                    self.stack.push(next);
-                }
+            if let Some(dir) = in_x
+                && let Ok(next_at) = at.go(dir)
+            {
+                let path_info = RevPathInfo {
+                    dir,
+                    prev_index: info_index,
+                };
+                self.infos.push(Some(path_info));
+                let next_index = self.infos.len() - 1;
+                let next = DFSNode {
+                    at: next_at,
+                    info_index: next_index,
+                };
+                self.stack.push(next);
             }
 
-            if let Some(dir) = in_y {
-                if let Ok(next_at) = at.go(dir) {
-                    let path_info = RevPathInfo {
-                        dir,
-                        prev_index: info_index,
-                    };
-                    self.infos.push(Some(path_info));
-                    let next_index = self.infos.len() - 1;
-                    let next = DFSNode {
-                        at: next_at,
-                        info_index: next_index,
-                    };
-                    self.stack.push(next);
-                }
+            if let Some(dir) = in_y
+                && let Ok(next_at) = at.go(dir)
+            {
+                let path_info = RevPathInfo {
+                    dir,
+                    prev_index: info_index,
+                };
+                self.infos.push(Some(path_info));
+                let next_index = self.infos.len() - 1;
+                let next = DFSNode {
+                    at: next_at,
+                    info_index: next_index,
+                };
+                self.stack.push(next);
             }
         }
         None
@@ -443,8 +443,8 @@ fn get_button_count(num_seq: &NumpadSequence, indirection: usize) -> usize {
     const START_GOAL_COMBIS: usize = ID_MAPPING.len() * ID_MAPPING.len();
 
     let mut table = vec![[0; START_GOAL_COMBIS]; indirection + 1];
-    for i in 0..25 {
-        table[0][i] = 1;
+    for v in table[0].iter_mut().take(25) {
+        *v = 1;
     }
 
     fn get_path_cost(path: &[DirpadButton], move_cost: &[usize]) -> usize {

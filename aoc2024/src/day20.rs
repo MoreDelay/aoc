@@ -143,7 +143,7 @@ impl RaceTrack {
         }
     }
 
-    fn iter_pos(&self) -> TrackPosIter {
+    fn iter_pos(&self) -> TrackPosIter<'_> {
         TrackPosIter::new(self)
     }
 
@@ -151,7 +151,7 @@ impl RaceTrack {
         CircleIter::new(self.size, origin, radius)
     }
 
-    fn iter_cheats(&self, length: usize) -> CheatsIter {
+    fn iter_cheats(&self, length: usize) -> CheatsIter<'_> {
         CheatsIter::new(self, length)
     }
 }

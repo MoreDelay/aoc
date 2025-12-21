@@ -11,11 +11,7 @@ fn parse_mul(input: &str) -> Vec<Mul> {
     const MAX_PATTERN: usize = 12;
 
     fn parse_val(s: &str) -> Option<usize> {
-        if s.len() > 3 {
-            None
-        } else {
-            s.parse().ok()
-        }
+        if s.len() > 3 { None } else { s.parse().ok() }
     }
 
     while !remaining.is_empty() {

@@ -201,9 +201,7 @@ impl Circuit {
     }
 
     fn propagate_signals(mut self) -> Circuit {
-        while let ControlFlow::Continue(()) = self.single_pass() {
-            self.single_pass();
-        }
+        while let ControlFlow::Continue(()) = self.single_pass() {}
         self
     }
 

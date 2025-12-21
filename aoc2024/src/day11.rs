@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     ops::ControlFlow,
     path::PathBuf,
 };
@@ -134,16 +134,13 @@ fn do_blinks_cached(stones: &Vec<Stone>, count: usize) -> usize {
         expand_cache(stone, count, &mut cache);
     }
 
-    let total = stones
+    stones
         .iter()
         .map(|s| {
             let key = (s.0, count);
-            let entry = cache.get(&key).expect("has been filled in expand_cache");
-            entry
+            cache.get(&key).expect("has been filled in expand_cache")
         })
-        .sum();
-
-    total
+        .sum()
 }
 
 pub fn run() -> Result<()> {

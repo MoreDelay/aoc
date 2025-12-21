@@ -1,4 +1,5 @@
 [workspace]
+resolver = "3"
 members = [
     "aoc2024",
     "aoc2025",

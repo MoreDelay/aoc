@@ -25,8 +25,8 @@ fn parse_locks_and_keys(input: &str) -> Result<(Vec<Lock>, Vec<Key>)> {
 
         let mut heights = [0; 5];
 
-        for (x, row) in map.iter().enumerate() {
-            for c in row.iter() {
+        for row in map.iter() {
+            for (x, c) in row.iter().enumerate() {
                 if *c == '#' {
                     heights[x] += 1;
                 }
@@ -49,7 +49,7 @@ fn count_overlap_free_pairings(locks: &[Lock], keys: &[Key]) -> usize {
     for lock in locks {
         for key in keys {
             let fitting_cols = zip(lock.heights, key.heights)
-                .filter(|(l, k)| l + k <= 5)
+                .filter(|(l, k)| l + k <= 7)
                 .count();
             if fitting_cols == 5 {
                 count += 1;
