@@ -639,7 +639,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
     #[test]
     fn test_closest_point_query() -> anyhow::Result<()> {
         let cursor = Cursor::new(EXAMPLE);
