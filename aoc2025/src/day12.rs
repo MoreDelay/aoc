@@ -125,6 +125,26 @@ impl Region {
         })
     }
 
+    fn shapes_fit_naive(&self, shapes: &[Shape]) -> bool {
+        assert_eq!(self.shape_counts.0.len(), shapes.len());
+
+        let blocked = self
+            .shape_counts
+            .0
+            .iter()
+            .zip(shapes.iter())
+            .map(|(c, s)| {
+                c * s
+                    .grid
+                    .iter()
+                    .filter(|(_, _, t)| matches!(t, Tile::Filled))
+                    .count()
+            })
+            .sum();
+        let open = self.width * self.height;
+        open >= blocked
+    }
+
     fn shapes_fit(&self, shapes: &[Shape], cache: &mut Cache) -> bool {
         assert_eq!(self.shape_counts.0.len(), shapes.len());
 
@@ -885,13 +905,17 @@ impl Puzzle {
     }
 
     fn count_fitting_regions(&self) -> usize {
-        let mut cache = Cache {
-            inner: HashMap::new(),
-        };
-
+        // let mut cache = Cache {
+        //     inner: HashMap::new(),
+        // };
+        //
+        // self.regions
+        //     .iter()
+        //     .filter(|region| region.shapes_fit(&self.shapes, &mut cache))
+        //     .count()
         self.regions
             .iter()
-            .filter(|region| region.shapes_fit(&self.shapes, &mut cache))
+            .filter(|region| region.shapes_fit_naive(&self.shapes))
             .count()
     }
 }

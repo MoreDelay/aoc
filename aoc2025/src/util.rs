@@ -99,6 +99,15 @@ impl<T> Grid<T> {
         let index = self.index(x, y)?;
         self.tiles.get_mut(index)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &T)> + '_ {
+        (0..self.height).flat_map(move |y| {
+            (0..self.width).map(move |x| {
+                let index = self.index(x, y).unwrap();
+                (x, y, &self.tiles[index])
+            })
+        })
+    }
 }
 
 impl<T> std::fmt::Display for Grid<T>
