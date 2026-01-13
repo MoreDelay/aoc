@@ -522,14 +522,14 @@ impl dfs::PathCountTracker for SvrPathCountTracker {
 
 impl SvrPathCountTracker {
     fn on_fft(&mut self) {
-        self.fft_out = self.out;
-        self.fft_dac_out = self.dac_out;
+        self.fft_out += self.out;
+        self.fft_dac_out += self.dac_out;
         self.out = 0;
         self.dac_out = 0;
     }
     fn on_dac(&mut self) {
-        self.dac_out = self.out;
-        self.fft_dac_out = self.fft_out;
+        self.dac_out += self.out;
+        self.fft_dac_out += self.fft_out;
         self.out = 0;
         self.fft_out = 0;
     }
