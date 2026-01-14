@@ -347,11 +347,14 @@ impl SpacePartition {
         &self,
         query_index: usize,
         filter: &impl Fn(usize) -> bool,
-        mut closest_found: ClosestFound,
-    ) -> ClosestFound {
+        mut closest_found: Option<ClosestFound>,
+    ) -> Option<ClosestFound> {
         assert!(query_index < self.points.len());
-        assert!(closest_found.index < self.points.len());
-        assert!(!closest_found.dist.is_nan());
+        assert!(
+            closest_found
+                .as_ref()
+                .is_none_or(|f| f.index < self.points.len() && !f.dist.is_nan())
+        );
 
         let query = self.points[query_index];
 
@@ -364,10 +367,12 @@ impl SpacePartition {
             let State { index } = state;
             let partition = &self.partitions[index];
 
-            // skip this partition if it is impossible is has closer points
+            // skip this partition if it is impossible it has closer points
             let min_point = partition.aabb.clamp(&query);
             let min_dist = min_point.dist(&query);
-            if min_dist >= closest_found.dist {
+            if let Some(f) = closest_found.as_ref()
+                && min_dist >= f.dist
+            {
                 continue;
             }
 
@@ -384,17 +389,16 @@ impl SpacePartition {
 
             // try to find closest points in this leaf
             if let Some(found) = self.search_leaf(query_index, index, filter)
-                && found.dist < closest_found.dist
+                && closest_found.as_ref().is_none_or(|f| found.dist < f.dist)
             {
-                closest_found = found;
+                closest_found = Some(found);
             }
         }
         closest_found
     }
 
     /// Finds the closest point (index) into self.points where filter(index) == true. The filter
-    /// takes in indices into self.points and returns whether to the given index as search
-    /// candidate.
+    /// takes in indices into self.points.
     fn find_closest_filtered(
         &self,
         query_index: usize,
@@ -402,9 +406,8 @@ impl SpacePartition {
     ) -> Option<ClosestFound> {
         assert!(query_index < self.points.len());
         let filter = |index| index != query_index && filter(index);
-        let cur_closest = self.initial_descent(query_index, &filter)?;
-        let cur_closest = self.global_search(query_index, &filter, cur_closest);
-        Some(cur_closest)
+        let cur_closest = self.initial_descent(query_index, &filter);
+        self.global_search(query_index, &filter, cur_closest)
     }
 }
 
@@ -434,18 +437,21 @@ impl GraphForest {
         }
         let mut candidate: Option<Candidate> = None;
         for query_index in 0..self.space_partition.points.len() {
-            let found = if !filter_for_tree_connections {
-                let filter = |index| {
-                    let min = query_index.min(index);
-                    let max = query_index.max(index);
-                    !self.prev_closest.contains(&(min, max))
-                };
-                self.space_partition
-                    .find_closest_filtered(query_index, filter)
-            } else {
-                let filter = |index| self.colors[query_index] != self.colors[index];
-                self.space_partition
-                    .find_closest_filtered(query_index, filter)
+            let found = match filter_for_tree_connections {
+                false => {
+                    let filter = |index| {
+                        let min = query_index.min(index);
+                        let max = query_index.max(index);
+                        !self.prev_closest.contains(&(min, max))
+                    };
+                    self.space_partition
+                        .find_closest_filtered(query_index, filter)
+                }
+                true => {
+                    let filter = |index| self.colors[query_index] != self.colors[index];
+                    self.space_partition
+                        .find_closest_filtered(query_index, filter)
+                }
             };
 
             let Some(found) = found else { continue };
@@ -577,10 +583,11 @@ pub fn day08() -> Result<(), Day08Error> {
     let product = forest.compute_network_product();
     println!("day08: network product is {product}");
 
+    let mut last = last.unwrap();
     while let Some(now) = forest.connect_new_wire() {
-        last = Some(now);
+        last = now;
     }
-    let product = forest.compute_connection_product(last.unwrap());
+    let product = forest.compute_connection_product(last);
     println!("day08: final connection product is {product}");
     Ok(())
 }

@@ -36,9 +36,13 @@ impl std::ops::DerefMut for BitMask {
     }
 }
 
-impl std::ops::BitXorAssign for BitMask {
-    fn bitxor_assign(&mut self, rhs: Self) {
-        self.inner ^= rhs.inner;
+impl std::ops::BitXor for BitMask {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        let inner = self.inner ^ rhs.inner;
+        let used = self.used.max(rhs.used);
+        Self { inner, used }
     }
 }
 
@@ -327,17 +331,15 @@ impl Machine {
             .flat_map(move |presses| BitPatternIterator::new(n_buttons, presses))
             .filter(move |button_mask| {
                 let acc = diagram.target;
-                let pattern =
-                    button_mask[..n_buttons]
+                let parities =
+                    button_mask
                         .iter()
-                        .enumerate()
-                        .fold(acc, |mut acc, (i, take)| {
-                            if *take {
-                                acc ^= self.buttons[i].flips;
-                            }
-                            acc
+                        .zip(self.buttons.iter())
+                        .fold(acc, |acc, (take, btn)| match *take {
+                            true => acc ^ btn.flips,
+                            false => acc,
                         });
-                pattern.count_ones() == 0
+                parities.count_ones() == 0
             })
     }
 
@@ -421,7 +423,7 @@ impl Machine {
             .flat_map(|mask| {
                 let joltage = self.joltage_from_button_mask(mask);
                 let target = target.reduce_by(&joltage)?;
-                let target = target.half_reqs().expect("made even above");
+                let target = target.half_reqs().expect("guaranteed even by mask_iter");
                 let buttons_used = mask.count_ones();
                 Some((target, buttons_used))
             })
@@ -477,12 +479,14 @@ impl Machine {
 
         while let Some(output) = stack.pop() {
             match output {
-                BifurcationOutput::Solved { target, solution } => match cache.entry(target) {
-                    Entry::Occupied(entry) => assert_eq!(*entry.get(), solution),
-                    Entry::Vacant(entry) => {
-                        entry.insert(solution);
+                BifurcationOutput::Solved { target, solution } => {
+                    match cache.entry(Rc::unwrap_or_clone(target)) {
+                        Entry::Occupied(entry) => assert_eq!(*entry.get(), solution),
+                        Entry::Vacant(entry) => {
+                            entry.insert(solution);
+                        }
                     }
-                },
+                }
                 BifurcationOutput::Recurse { next_target, state } => {
                     match cache.get(&next_target) {
                         Some(&solution) => {
